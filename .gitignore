@@ -1,0 +1,4 @@
+/target
+examples/results
+src/test_data/.*
+.idea

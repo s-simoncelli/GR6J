@@ -1,0 +1,21 @@
+[package]
+name = "gr6j"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "gr6j"
+#crate-type = ["cdylib"]
+
+[dependencies]
+#pyo3 = { version = "0.21.0", features = ["extension-module"] }
+chrono = { version = "0.4.34" }
+thiserror = "1.0.58"
+log = "0.4.21"
+env_logger = "0.11.3"
+charming = { version = "0.3.1", features = ["ssr"] }
+plotters = "0.3.5"
+csv = "1.3.0"
+
+[dev-dependencies]
+float-cmp = "0.9.0"
