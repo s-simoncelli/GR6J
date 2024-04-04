@@ -31,3 +31,11 @@ pub enum RunModelError {
     #[error("The {0} chart file cannot be generated because {1}")]
     CannotGenerateChart(String, String),
 }
+
+#[derive(Error, Debug)]
+pub enum FdcError {
+    #[error("The max percentile must be less or equal to 100")]
+    PercentileTooLarge(),
+    #[error("The min percentile must be larger or equal to 0")]
+    PercentileTooSmall(),
+}

@@ -1,9 +1,10 @@
-use crate::chart::generate_summary_chart;
+use crate::chart::{generate_fdc_chart, generate_summary_chart, FDCData};
 use crate::error::{LoadModelError, RunModelError};
 use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
 use crate::outputs::{GR6JOutputs, ModelStepData, ModelStepDataVector};
 use crate::parameter::Parameter;
 use crate::unit_hydrograph::{UnitHydrograph, UnitHydrographInputs, UnitHydrographType};
+use crate::utils::calculate_fdc;
 use chrono::{Local, NaiveDate, TimeDelta};
 use csv::Writer;
 use log::{debug, info, warn};
@@ -63,7 +64,7 @@ pub struct GR6JModel {
     /// The observed run=off time-series.
     pub observed: Option<Vec<f64>>,
     /// Conversion to apply to the run-off data.
-    run_off_unit: RunOffUnit,
+    pub run_off_unit: RunOffUnit,
 }
 
 impl GR6JModel {
@@ -353,6 +354,7 @@ impl GR6JModel {
             total_run_off.push(q);
         }
 
+        let fdc = calculate_fdc(&total_run_off);
         let results = GR6JOutputs {
             catchment_outputs,
             time,
@@ -397,9 +399,34 @@ impl GR6JModel {
                 }
             }
 
+            // Export FDC
+            let fdc_dest = destination.join("FDC.csv");
+            self.write_fdc_file(&fdc.0, &fdc.1, self.run_off_unit.unit_label(), &fdc_dest)
+                .map_err(|e| {
+                    RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string())
+                })?;
+            debug!("Exported FDC CSV file");
+
             // Generate charts
             generate_summary_chart(self, &results, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("summary".to_string(), e.to_string()))?;
+
+            let sim_fdc = FDCData {
+                exceedence: fdc.0,
+                run_off: fdc.1,
+            };
+            let obs_fdc = match &self.observed {
+                None => None,
+                Some(q) => {
+                    let fdc = calculate_fdc(q);
+                    Some(FDCData {
+                        exceedence: fdc.0,
+                        run_off: fdc.1,
+                    })
+                }
+            };
+            generate_fdc_chart(self, sim_fdc, obs_fdc, destination)
+                .map_err(|e| RunModelError::CannotGenerateChart("fdc".to_string(), e.to_string()))?;
         }
 
         Ok(results)
@@ -589,6 +616,33 @@ impl GR6JModel {
         Ok(())
     }
 
+    /// Export the FDC to a CSV file.
+    ///
+    /// # Arguments
+    ///
+    /// * `percentiles`: The vector of percentiles.
+    /// * `flow_rate`: The flow rate.
+    /// * `run_off_unit`: The run-off unit of measurement.
+    /// * `destination`: The path to the CSV file.
+    ///
+    /// returns: Result<(), csv::Error>
+    fn write_fdc_file(
+        &self,
+        percentiles: &[f64],
+        flow_rate: &[f64],
+        run_off_unit: &str,
+        destination: &Path,
+    ) -> Result<(), csv::Error> {
+        let mut wtr = Writer::from_path(destination)?;
+        wtr.write_record(["Percentage exceedance", format!("Run-off ({})", run_off_unit).as_str()])?;
+
+        for (pct, q) in percentiles.iter().zip(flow_rate) {
+            wtr.write_record([pct.to_string(), q.to_string()])?;
+            wtr.flush()?;
+        }
+        Ok(())
+    }
+
     /// Export the list of parameters for one hydrological unit.
     ///
     /// # Arguments
@@ -645,11 +699,9 @@ impl GR6JModel {
 
 #[cfg(test)]
 mod tests {
-    use crate::inputs::{CatchmentData, RunOffUnit};
-    use crate::model::{
-        CatchmentType, GR6JModel, GR6JModelInputs, ModelPeriod, ModelStepData, ModelStepDataVector, Parameter,
-        StoreLevels,
-    };
+    use crate::inputs::{CatchmentData, RunOffUnit, StoreLevels};
+    use crate::model::{CatchmentType, GR6JModel, GR6JModelInputs, ModelPeriod, Parameter};
+    use crate::outputs::{ModelStepData, ModelStepDataVector};
     use chrono::{Datelike, NaiveDate, TimeDelta};
     use float_cmp::{approx_eq, F64Margin};
     use std::env;
@@ -657,13 +709,143 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
 
+    /// Parse the result file for a GR6J run from R
+    fn parse_r_file(file: &Path) -> ModelStepDataVector {
+        let file = File::open(file).expect("Failed to read CSV file");
+        let mut data: Vec<ModelStepData> = vec![];
+
+        for result in csv::Reader::from_reader(file).records() {
+            let record = result.unwrap();
+            data.push(ModelStepData {
+                time: NaiveDate::from_str(record.get(0).unwrap()).unwrap(),
+                evapotranspiration: record.get(2).unwrap().parse::<f64>().unwrap(),
+                precipitation: record.get(1).unwrap().parse::<f64>().unwrap(),
+                net_rainfall: record.get(3).unwrap().parse::<f64>().unwrap(),
+                store_levels: StoreLevels {
+                    production_store: record.get(11).unwrap().parse::<f64>().unwrap(),
+                    routing_store: record.get(12).unwrap().parse::<f64>().unwrap(),
+                    exponential_store: record.get(13).unwrap().parse::<f64>().unwrap(),
+                },
+                storage_p: record.get(4).unwrap().parse::<f64>().unwrap(),
+                actual_evapotranspiration: record.get(16).unwrap().parse::<f64>().unwrap(),
+                percolation: record.get(6).unwrap().parse::<f64>().unwrap(),
+                pr: record.get(5).unwrap().parse::<f64>().unwrap(),
+                exchange: record.get(7).unwrap().parse::<f64>().unwrap(),
+                exchange_from_routing_store: record.get(8).unwrap().parse::<f64>().unwrap(),
+                exchange_from_direct_branch: record.get(9).unwrap().parse::<f64>().unwrap(),
+                actual_exchange: record.get(15).unwrap().parse::<f64>().unwrap(),
+                routing_store_outflow: record.get(10).unwrap().parse::<f64>().unwrap(),
+                exponential_store_outflow: record.get(17).unwrap().parse::<f64>().unwrap(),
+                outflow_from_uh2_branch: record.get(14).unwrap().parse::<f64>().unwrap(),
+                run_off: record.get(18).unwrap().parse::<f64>().unwrap(),
+            });
+        }
+        ModelStepDataVector(data)
+    }
+
     /// Get the test path
     fn test_path() -> PathBuf {
         Path::new(&env::current_dir().unwrap()).join("src").join("test_data")
     }
 
+    /// Run the model and compare the results against data generate for the airGR R package.
+    ///
+    /// # Arguments
+    ///
+    /// * `r_csv_file`: The CSV file name with the R-exported data.
+    /// * `start_year`: Start collecting input data when this year is reached.
+    /// * `stop_year`: Stop collecting input data when this year is reached.
+    /// * `start`: Model start date. Default to first day in the input data.
+    /// * `end`: Model end date. Default to last day in the input data.
+    /// * `parameters`: The list of model parameters.
+    ///
+    /// returns: ()
+    fn compare_against_r_data(
+        r_csv_file: &str,
+        start_year: i32,
+        stop_year: i32,
+        start: Option<NaiveDate>,
+        end: Option<NaiveDate>,
+        parameters: [Parameter; 6],
+    ) {
+        let expected_data = parse_r_file(test_path().join(r_csv_file).as_ref());
+        let file = File::open(test_path().join("airGR_L0123001_dataset.csv")).expect("Failed to read CSV file");
+        let mut rdr = csv::Reader::from_reader(file);
+
+        let mut time: Vec<NaiveDate> = vec![];
+        let mut precipitation: Vec<f64> = vec![];
+        let mut evapotranspiration: Vec<f64> = vec![];
+        for result in rdr.records() {
+            let record = result.unwrap();
+            let date = NaiveDate::parse_from_str(record.get(0).unwrap(), "%d/%m/%Y").unwrap();
+
+            if date.year() < start_year {
+                continue;
+            }
+            if date.year() > stop_year {
+                break;
+            }
+
+            time.push(date);
+            precipitation.push(record.get(1).unwrap().parse::<f64>().unwrap());
+            evapotranspiration.push(record.get(2).unwrap().parse::<f64>().unwrap());
+        }
+
+        let start = match start {
+            None => *time.first().unwrap(),
+            Some(s) => s,
+        };
+        let end = match end {
+            None => *time.last().unwrap(),
+            Some(e) => e,
+        };
+
+        let catchment_data = CatchmentData {
+            area: 1.0,
+            x1: parameters[0],
+            x2: parameters[1],
+            x3: parameters[2],
+            x4: parameters[3],
+            x5: parameters[4],
+            x6: parameters[5],
+            store_levels: None,
+        };
+        let inputs = GR6JModelInputs {
+            time,
+            precipitation,
+            evapotranspiration,
+            catchment: CatchmentType::OneCatchment(catchment_data),
+            run_period: ModelPeriod { start, end },
+            warmup_period: None,
+            destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
+        };
+
+        let mut model = GR6JModel::new(inputs).unwrap();
+        let results = model.run().expect("Cannot fetch results");
+
+        // compare all data
+        assert_approx_array_eq(
+            results.catchment_outputs[0].production_store().as_ref(),
+            &expected_data.production_store(),
+        );
+        assert_approx_array_eq(
+            results.catchment_outputs[0].routing_store().as_ref(),
+            &expected_data.routing_store(),
+        );
+        assert_approx_array_eq(
+            results.catchment_outputs[0].exponential_store().as_ref(),
+            &expected_data.exponential_store(),
+        );
+        assert_approx_array_eq(
+            results.run_off.as_ref(),
+            &expected_data.run_off(Some(catchment_data.area)),
+        );
+    }
+
     /// Compare two arrays of f64
-    pub fn assert_approx_array_eq(calculated_values: &[f64], expected_values: &Vec<f64>) {
+    fn assert_approx_array_eq(calculated_values: &[f64], expected_values: &Vec<f64>) {
         let margins = F64Margin {
             epsilon: 2.0,
             ulps: (f64::EPSILON * 2.0) as i64,
@@ -864,136 +1046,6 @@ mod tests {
             model.unwrap_err().to_string(),
             "The run start date must be larger or equal to the first date in the time vector".to_string()
         )
-    }
-
-    /// Parse the result file for a GR6J run from R
-    fn parse_r_file(file: &Path) -> ModelStepDataVector {
-        let file = File::open(file).expect("Failed to read CSV file");
-        let mut data: Vec<ModelStepData> = vec![];
-
-        for result in csv::Reader::from_reader(file).records() {
-            let record = result.unwrap();
-            data.push(ModelStepData {
-                time: NaiveDate::from_str(record.get(0).unwrap()).unwrap(),
-                evapotranspiration: record.get(2).unwrap().parse::<f64>().unwrap(),
-                precipitation: record.get(1).unwrap().parse::<f64>().unwrap(),
-                net_rainfall: record.get(3).unwrap().parse::<f64>().unwrap(),
-                store_levels: StoreLevels {
-                    production_store: record.get(11).unwrap().parse::<f64>().unwrap(),
-                    routing_store: record.get(12).unwrap().parse::<f64>().unwrap(),
-                    exponential_store: record.get(13).unwrap().parse::<f64>().unwrap(),
-                },
-                storage_p: record.get(4).unwrap().parse::<f64>().unwrap(),
-                actual_evapotranspiration: record.get(16).unwrap().parse::<f64>().unwrap(),
-                percolation: record.get(6).unwrap().parse::<f64>().unwrap(),
-                pr: record.get(5).unwrap().parse::<f64>().unwrap(),
-                exchange: record.get(7).unwrap().parse::<f64>().unwrap(),
-                exchange_from_routing_store: record.get(8).unwrap().parse::<f64>().unwrap(),
-                exchange_from_direct_branch: record.get(9).unwrap().parse::<f64>().unwrap(),
-                actual_exchange: record.get(15).unwrap().parse::<f64>().unwrap(),
-                routing_store_outflow: record.get(10).unwrap().parse::<f64>().unwrap(),
-                exponential_store_outflow: record.get(17).unwrap().parse::<f64>().unwrap(),
-                outflow_from_uh2_branch: record.get(14).unwrap().parse::<f64>().unwrap(),
-                run_off: record.get(18).unwrap().parse::<f64>().unwrap(),
-            });
-        }
-        ModelStepDataVector(data)
-    }
-
-    /// Run the model and compare the results against data generate for the airGR R package.
-    ///
-    /// # Arguments
-    ///
-    /// * `r_csv_file`: The CSV file name with the R-exported data.
-    /// * `start_year`: Start collecting input data when this year is reached.
-    /// * `stop_year`: Stop collecting input data when this year is reached.
-    /// * `start`: Model start date. Default to first day in the input data.
-    /// * `end`: Model end date. Default to last day in the input data.
-    /// * `parameters`: The list of model parameters.
-    ///
-    /// returns: ()
-    fn compare_against_r_data(
-        r_csv_file: &str,
-        start_year: i32,
-        stop_year: i32,
-        start: Option<NaiveDate>,
-        end: Option<NaiveDate>,
-        parameters: [Parameter; 6],
-    ) {
-        let expected_data = parse_r_file(test_path().join(r_csv_file).as_ref());
-        let file = File::open(test_path().join("airGR_L0123001_dataset.csv")).expect("Failed to read CSV file");
-        let mut rdr = csv::Reader::from_reader(file);
-
-        let mut time: Vec<NaiveDate> = vec![];
-        let mut precipitation: Vec<f64> = vec![];
-        let mut evapotranspiration: Vec<f64> = vec![];
-        for result in rdr.records() {
-            let record = result.unwrap();
-            let date = NaiveDate::parse_from_str(record.get(0).unwrap(), "%d/%m/%Y").unwrap();
-
-            if date.year() < start_year {
-                continue;
-            }
-            if date.year() > stop_year {
-                break;
-            }
-
-            time.push(date);
-            precipitation.push(record.get(1).unwrap().parse::<f64>().unwrap());
-            evapotranspiration.push(record.get(2).unwrap().parse::<f64>().unwrap());
-        }
-
-        let start = match start {
-            None => *time.first().unwrap(),
-            Some(s) => s,
-        };
-        let end = match end {
-            None => *time.last().unwrap(),
-            Some(e) => e,
-        };
-
-        let catchment_data = CatchmentData {
-            area: 1.0,
-            x1: parameters[0],
-            x2: parameters[1],
-            x3: parameters[2],
-            x4: parameters[3],
-            x5: parameters[4],
-            x6: parameters[5],
-            store_levels: None,
-        };
-        let inputs = GR6JModelInputs {
-            time,
-            precipitation,
-            evapotranspiration,
-            catchment: CatchmentType::OneCatchment(catchment_data),
-            run_period: ModelPeriod { start, end },
-            warmup_period: None,
-            destination: None,
-            observed_runoff: None,
-            run_off_unit: RunOffUnit::NoConversion,
-        };
-
-        let mut model = GR6JModel::new(inputs).unwrap();
-        let results = model.run().expect("Cannot fetch results");
-
-        // compare all data
-        assert_approx_array_eq(
-            results.catchment_outputs[0].production_store().as_ref(),
-            &expected_data.production_store(),
-        );
-        assert_approx_array_eq(
-            results.catchment_outputs[0].routing_store().as_ref(),
-            &expected_data.routing_store(),
-        );
-        assert_approx_array_eq(
-            results.catchment_outputs[0].exponential_store().as_ref(),
-            &expected_data.exponential_store(),
-        );
-        assert_approx_array_eq(
-            results.run_off.as_ref(),
-            &expected_data.run_off(Some(catchment_data.area)),
-        );
     }
 
     #[test]

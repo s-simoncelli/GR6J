@@ -74,12 +74,14 @@ pub struct CatchmentData {
 /// Convert the run-off to the desired unit of measurement
 #[derive(Debug)]
 pub enum RunOffUnit {
-    /// Keep the run-off in mm*km2/day
+    /// Keep the run-off in mm*km2/d
     NoConversion,
-    /// Convert the run-off to m³/day
-    CubicMetre,
-    /// Convert the run-off to Ml/day
-    Ml,
+    /// Convert the run-off to m³/d
+    CubicMetrePerDay,
+    /// Convert the run-off to Ml/d
+    MlPerDay,
+    /// Convert the run-off to m³/s
+    CubicMetrePerSecond,
 }
 
 impl Default for RunOffUnit {
@@ -93,8 +95,9 @@ impl RunOffUnit {
     pub fn conv_factor(&self) -> f64 {
         match self {
             RunOffUnit::NoConversion => 1.0,
-            RunOffUnit::CubicMetre => 1.0 / 1000.0,
-            RunOffUnit::Ml => 1.0,
+            RunOffUnit::CubicMetrePerDay => 1.0 / 1000.0,
+            RunOffUnit::CubicMetrePerSecond => 86400.0 / 1000.0,
+            RunOffUnit::MlPerDay => 1.0,
         }
     }
 
@@ -102,8 +105,9 @@ impl RunOffUnit {
     pub fn unit_label(&self) -> &str {
         match self {
             RunOffUnit::NoConversion => "-",
-            RunOffUnit::CubicMetre => "m³/day",
-            RunOffUnit::Ml => "Ml/day",
+            RunOffUnit::CubicMetrePerDay => "m³/d",
+            RunOffUnit::CubicMetrePerSecond => "m³/s",
+            RunOffUnit::MlPerDay => "Ml/d",
         }
     }
 }
