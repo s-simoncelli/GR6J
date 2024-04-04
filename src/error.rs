@@ -22,6 +22,8 @@ pub enum LoadModelError {
 
 #[derive(Error, Debug)]
 pub enum RunModelError {
+    #[error("The run-off conversion factor must be larger than 0")]
+    WrongConversion(),
     #[error("The simulation end date was reached and the model cannot advanced anymore")]
     ReachedSimulationEnd(),
     #[error("The CSV file '{0}' cannot be exported because {1}")]

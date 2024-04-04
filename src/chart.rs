@@ -1,10 +1,16 @@
 use crate::model::GR6JModel;
 use crate::outputs::GR6JOutputs;
 use chrono::{Datelike, NaiveDate};
+use plotters::prelude::full_palette::GREY_A400;
 use plotters::prelude::*;
 use std::path::Path;
 
 const FONT: &str = "sans-serif";
+
+/// Get the series max value
+fn series_max(series: &[f64]) -> f64 {
+    *series.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap()
+}
 
 /// Generate the chart with the input data and the simulated run off.
 ///
@@ -26,10 +32,11 @@ pub fn generate_summary_chart(
         model.evapotranspiration.clone(),
         results.run_off.clone(),
     ];
-    let labels = ["Rainfall (mm)", "Evapotranspiration (mm)", "Run off (m³/day)"];
+    let axis_labels = ["Rainfall (mm)", "Evapotranspiration (mm)", "Run off (m³/day)"];
+    let labels = ["Rainfall", "Evapotranspiration", "Simulated"];
 
     let full_file = destination.join("Summary.png");
-    let root_area = BitMapBackend::new(&full_file, (2100 / 2, 2970 / 2 as u32)).into_drawing_area();
+    let root_area = BitMapBackend::new(&full_file, (2100 / 2, 2970 / 2)).into_drawing_area();
     root_area.fill(&WHITE)?;
 
     let root_area = root_area.titled("Inputs & simulated run-off", (FONT, 30))?;
@@ -39,8 +46,13 @@ pub fn generate_summary_chart(
     let t_range = (*time.first().unwrap()..*time.last().unwrap()).yearly();
     for (idx, panel) in panels.iter().enumerate() {
         let series = &all_series[idx];
-        // for (idx, series) in [precipitation, evaporation, run_off].iter().enumerate() {
-        let mut p_max = *series.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let has_observed = idx == 2 && model.observed.is_some();
+
+        let mut p_max = series_max(series);
+        if has_observed {
+            let observed = model.observed.as_ref().unwrap();
+            p_max = p_max.max(series_max(observed));
+        }
         if p_max > 1.0 {
             p_max = p_max.ceil();
         };
@@ -55,17 +67,43 @@ pub fn generate_summary_chart(
             .build_cartesian_2d(t_range.clone(), 0.0..p_max)?;
 
         cc.configure_mesh()
-            .y_desc(labels[idx])
+            .y_desc(axis_labels[idx])
             .axis_desc_style((FONT, 22, &BLACK))
             .label_style((FONT, 20, &BLACK))
             .x_label_formatter(&|v| v.year().to_string())
             .draw()?;
 
-        cc.draw_series(AreaSeries::new(
+        cc.draw_series(LineSeries::new(
             time.iter().zip(series).map(|(t, p)| (*t, *p)),
-            0.0,
-            colours[idx].mix(0.6),
-        ))?;
+            ShapeStyle {
+                color: colours[idx].to_rgba(),
+                filled: false,
+                stroke_width: 1,
+            },
+        ))?
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], colours[idx].to_rgba()))
+        .label(labels[idx]);
+
+        if idx == 2 && model.observed.is_some() {
+            let observed = model.observed.as_ref().unwrap();
+            cc.draw_series(LineSeries::new(
+                time.iter().zip(observed).map(|(t, p)| (*t, *p)),
+                ShapeStyle {
+                    color: BLACK.into(),
+                    filled: false,
+                    stroke_width: 1,
+                },
+            ))?
+            .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLACK))
+            .label("Observed");
+
+            cc.configure_series_labels()
+                .border_style(GREY_A400)
+                .background_style(WHITE)
+                .label_font((FONT, 20))
+                .position(SeriesLabelPosition::Coordinate(2, 2))
+                .draw()?;
+        }
     }
 
     root_area.present()?;

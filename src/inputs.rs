@@ -71,6 +71,43 @@ pub struct CatchmentData {
     pub store_levels: Option<StoreLevels>,
 }
 
+/// Convert the run-off to the desired unit of measurement
+#[derive(Debug)]
+pub enum RunOffUnit {
+    /// Keep the run-off in mm*km2/day
+    NoConversion,
+    /// Convert the run-off to m³/day
+    CubicMetre,
+    /// Convert the run-off to Ml/day
+    Ml,
+}
+
+impl Default for RunOffUnit {
+    fn default() -> Self {
+        Self::NoConversion
+    }
+}
+
+impl RunOffUnit {
+    /// Get the conversion factor to multiply with the run-off data.
+    pub fn conv_factor(&self) -> f64 {
+        match self {
+            RunOffUnit::NoConversion => 1.0,
+            RunOffUnit::CubicMetre => 1.0 / 1000.0,
+            RunOffUnit::Ml => 1.0,
+        }
+    }
+
+    /// Get the conversion factor unit.
+    pub fn unit_label(&self) -> &str {
+        match self {
+            RunOffUnit::NoConversion => "-",
+            RunOffUnit::CubicMetre => "m³/day",
+            RunOffUnit::Ml => "Ml/day",
+        }
+    }
+}
+
 // TODO add doc explaining how this works
 #[derive(Debug)]
 pub struct GR6JModelInputs {
@@ -93,4 +130,9 @@ pub struct GR6JModelInputs {
     /// Whether to export charts, the simulated run-off and other diagnostic file into a sub-folder
     /// inside the given destination folder. The sub-folder will be named with the run timestamp.
     pub destination: Option<PathBuf>,
+    /// The time series of the observed run-off. The time-series and its FDC will be plotted against
+    /// the simulated run-off if [`self.destination`] is provided.
+    pub observed_runoff: Option<Vec<f64>>,
+    /// Convert the run-off to the desired unit of measurement.
+    pub run_off_unit: RunOffUnit,
 }

@@ -1,6 +1,6 @@
 use crate::chart::generate_summary_chart;
 use crate::error::{LoadModelError, RunModelError};
-use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, StoreLevels};
+use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
 use crate::outputs::{GR6JOutputs, ModelStepData, ModelStepDataVector};
 use crate::parameter::Parameter;
 use crate::unit_hydrograph::{UnitHydrograph, UnitHydrographInputs, UnitHydrographType};
@@ -60,6 +60,10 @@ pub struct GR6JModel {
     collect_data_from: NaiveDate,
     /// The path where to save the files
     destination: Option<PathBuf>,
+    /// The observed run=off time-series.
+    pub observed: Option<Vec<f64>>,
+    /// Conversion to apply to the run-off data.
+    run_off_unit: RunOffUnit,
 }
 
 impl GR6JModel {
@@ -110,6 +114,11 @@ impl GR6JModel {
         }
         if inputs.time.len() != inputs.evapotranspiration.len() {
             return Err(LoadModelError::MismatchedLength("evapotranspiration".to_string()));
+        }
+        if let Some(observed) = &inputs.observed_runoff {
+            if inputs.time.len() != observed.len() {
+                return Err(LoadModelError::MismatchedLength("observed run-off".to_string()));
+            }
         }
 
         // Check time
@@ -224,6 +233,7 @@ impl GR6JModel {
         let time = inputs.time[start_index..end_index].to_owned();
         let precipitation = inputs.precipitation[start_index..end_index].to_owned();
         let evapotranspiration = inputs.evapotranspiration[start_index..end_index].to_owned();
+        let observed = inputs.observed_runoff.map(|q| q[start_index..end_index].to_owned());
 
         // Convert data for one catchment
         let catchments_data = match inputs.catchment {
@@ -288,6 +298,8 @@ impl GR6JModel {
             collect_data_from: inputs.run_period.start,
             models,
             destination,
+            observed,
+            run_off_unit: inputs.run_off_unit,
         })
     }
 
@@ -325,13 +337,18 @@ impl GR6JModel {
             run_offs.push(data.run_off(Some(self.models[model_index].area)));
         }
 
+        let conv_factor = self.run_off_unit.conv_factor();
+        if conv_factor <= 0.0 {
+            return Err(RunModelError::WrongConversion());
+        }
+
         // get the combined run off components for all hydrological units
         let mut total_run_off: Vec<f64> = vec![];
         for step_index in 0..run_offs[0].len() {
             let mut q = 0.0;
             for q_t in run_offs.iter() {
                 // convert from mm*km2/day to m3/day
-                q += q_t[step_index] / 1000.0;
+                q += q_t[step_index] * conv_factor;
             }
             total_run_off.push(q);
         }
@@ -345,10 +362,13 @@ impl GR6JModel {
         if let Some(destination) = &self.destination {
             // Export run-off CSV file
             let runoff_dest = destination.join("Run-off.csv");
-            self.write_run_off_file(results.time.as_ref(), results.run_off.as_ref(), &runoff_dest)
-                .map_err(|e| {
-                    RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string())
-                })?;
+            self.write_run_off_file(
+                results.time.as_ref(),
+                results.run_off.as_ref(),
+                self.run_off_unit.unit_label(),
+                &runoff_dest,
+            )
+            .map_err(|e| RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string()))?;
             debug!("Exported run-off CSV file");
 
             // Export parameters
@@ -548,6 +568,7 @@ impl GR6JModel {
     ///
     /// * `time`: The vector with the date.
     /// * `total_run_off`: The vector with the run-off values.
+    /// * `run_off_unit`: The run-off unit of measurement.
     /// * `destination`: The path to the CSV file.
     ///
     /// returns: Result<(), csv::Error>
@@ -555,11 +576,11 @@ impl GR6JModel {
         &self,
         time: &[NaiveDate],
         total_run_off: &[f64],
+        run_off_unit: &str,
         destination: &Path,
     ) -> Result<(), csv::Error> {
         let mut wtr = Writer::from_path(destination)?;
-        // let mut wtr = Writer::from_path(Path::new("./Run-off.csv"))?;
-        wtr.write_record(["Date", "Run-off (m³/day)"])?;
+        wtr.write_record(["Date", format!("Run-off ({})", run_off_unit).as_str()])?;
 
         for (step_index, q) in total_run_off.iter().enumerate() {
             wtr.write_record(&[time[step_index].to_string(), q.to_string()])?;
@@ -624,7 +645,7 @@ impl GR6JModel {
 
 #[cfg(test)]
 mod tests {
-    use crate::inputs::CatchmentData;
+    use crate::inputs::{CatchmentData, RunOffUnit};
     use crate::model::{
         CatchmentType, GR6JModel, GR6JModelInputs, ModelPeriod, ModelStepData, ModelStepDataVector, Parameter,
         StoreLevels,
@@ -638,7 +659,7 @@ mod tests {
 
     /// Get the test path
     fn test_path() -> PathBuf {
-        Path::new(&env::current_dir().unwrap()).join("").join("test_data")
+        Path::new(&env::current_dir().unwrap()).join("src").join("test_data")
     }
 
     /// Compare two arrays of f64
@@ -691,6 +712,8 @@ mod tests {
             },
             warmup_period: None,
             destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
         };
 
         let x1 = catchment_data.x1;
@@ -729,6 +752,8 @@ mod tests {
             },
             warmup_period: None,
             destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
         };
 
         let model = GR6JModel::new(inputs);
@@ -762,6 +787,8 @@ mod tests {
             },
             warmup_period: None,
             destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
         };
         let model = GR6JModel::new(inputs);
         assert_eq!(
@@ -771,7 +798,7 @@ mod tests {
     }
 
     #[test]
-    fn test_continuous_dates() {
+    fn test_non_continuous_dates() {
         let mut t = build_t_vector();
         t[365] += TimeDelta::try_days(3).unwrap();
         let catchment_data = CatchmentData {
@@ -795,6 +822,8 @@ mod tests {
             },
             warmup_period: None,
             destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
         };
         let model = GR6JModel::new(inputs);
         assert_eq!(
@@ -827,6 +856,8 @@ mod tests {
             },
             warmup_period: None,
             destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
         };
         let model = GR6JModel::new(inputs);
         assert_eq!(
@@ -939,6 +970,8 @@ mod tests {
             run_period: ModelPeriod { start, end },
             warmup_period: None,
             destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
         };
 
         let mut model = GR6JModel::new(inputs).unwrap();
@@ -1025,6 +1058,27 @@ mod tests {
     }
 
     #[test]
+    /// Test simulation with L0123001 dataset from 1994-01-01 to 1998-12-31 w warmup period and
+    /// different parameters.
+    fn test_gr6j_l0123001_sc3() {
+        compare_against_r_data(
+            "airGR_results_L0123001_sc3.csv",
+            1990,
+            1998,
+            Some(NaiveDate::from_ymd_opt(1994, 1, 1).unwrap()),
+            Some(NaiveDate::from_ymd_opt(1998, 12, 31).unwrap()),
+            [
+                Parameter::X1(31.0),
+                Parameter::X2(3.47),
+                Parameter::X3(32.0),
+                Parameter::X4(2.1),
+                Parameter::X5(0.55),
+                Parameter::X6(5.3),
+            ],
+        );
+    }
+
+    #[test]
     /// Test the model with multiple hydrological units
     fn test_grg6_hu() {
         let file = File::open(test_path().join("airGR_L0123001_dataset.csv")).expect("Failed to read CSV file");
@@ -1071,6 +1125,8 @@ mod tests {
             run_period: ModelPeriod { start, end },
             warmup_period: None,
             destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
         };
 
         let mut model = GR6JModel::new(inputs).unwrap();
