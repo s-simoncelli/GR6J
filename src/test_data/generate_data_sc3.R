@@ -4,11 +4,9 @@ data(L0123001, package = "airGR")
 
 setwd(getSrcDirectory(function(){})[1])
 
-# remove data before start date to disable warm-up period
-BasinObs = BasinObs[format(BasinObs$DatesR, format = "%Y-%m-%d") >= "1984-01-01", ]
-
-Ind_Run <- seq(which(format(BasinObs$DatesR, format = "%Y-%m-%d") == "1984-01-01"), 
-               which(format(BasinObs$DatesR, format = "%Y-%m-%d") == "1994-12-31"))
+# remove warm-up
+Ind_Run <- seq(which(format(BasinObs$DatesR, format = "%Y-%m-%d") == "1994-01-01"), 
+               which(format(BasinObs$DatesR, format = "%Y-%m-%d") == "1998-12-31"))
 
 # create inputs
 InputsModel <- CreateInputsModel(FUN_MOD = RunModel_GR6J, DatesR = BasinObs$DatesR,
@@ -20,7 +18,7 @@ RunOptions <- CreateRunOptions(FUN_MOD = RunModel_GR6J,
                                IniStates = NULL, IniResLevels = NULL,
                                IndPeriod_WarmUp = NULL)
 
-Param <- c(1250, 0.3, 500, 5.2, 2, 10);
+Param <- c(31, 3.47, 32, 2.1, 0.55, 5.3);
 OutputsModel <- RunModel_GR6J(InputsModel = InputsModel, RunOptions = RunOptions, 
                               Param = Param)
 
@@ -41,4 +39,4 @@ colnames(df) <- c("Date", "precipitation", "evapotranspiration", "net_rainfall",
                  "actual_evapotranspiration", "exponential_store_outflow", "run_off")
 
 
-write.csv(df, "airGR_results_L0123001_no_warmup.csv", row.names = FALSE)
+write.csv(df, "airGR_results_L0123001_sc3.csv", row.names = FALSE)
