@@ -702,8 +702,8 @@ mod tests {
     use crate::inputs::{CatchmentData, RunOffUnit, StoreLevels};
     use crate::model::{CatchmentType, GR6JModel, GR6JModelInputs, ModelPeriod, Parameter};
     use crate::outputs::{ModelStepData, ModelStepDataVector};
+    use crate::utils::assert_approx_array_eq;
     use chrono::{Datelike, NaiveDate, TimeDelta};
-    use float_cmp::{approx_eq, F64Margin};
     use std::env;
     use std::fs::File;
     use std::path::{Path, PathBuf};
@@ -842,23 +842,6 @@ mod tests {
             results.run_off.as_ref(),
             &expected_data.run_off(Some(catchment_data.area)),
         );
-    }
-
-    /// Compare two arrays of f64
-    fn assert_approx_array_eq(calculated_values: &[f64], expected_values: &Vec<f64>) {
-        let margins = F64Margin {
-            epsilon: 2.0,
-            ulps: (f64::EPSILON * 2.0) as i64,
-        };
-        for (i, (calculated, expected)) in calculated_values.iter().zip(expected_values).enumerate() {
-            if !approx_eq!(f64, *calculated, *expected, margins) {
-                panic!(
-                    r#"assertion failed on item #{i:?}
-                    actual: `{calculated:?}`,
-                    expected: `{expected:?}`"#,
-                )
-            }
-        }
     }
 
     fn build_t_vector() -> Vec<NaiveDate> {

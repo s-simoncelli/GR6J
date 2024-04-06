@@ -167,7 +167,7 @@ pub(crate) fn generate_fdc_chart(
         .margin_top(5)
         .margin_left(20)
         .margin_right(30)
-        .build_cartesian_2d(0.0..100.0, (0.0..q_max))?;
+        .build_cartesian_2d(0.0..100.0, 0.0..q_max)?;
 
     cc1.configure_mesh()
         .y_desc(format!("Run off ({})", model.run_off_unit.unit_label()).as_str())
