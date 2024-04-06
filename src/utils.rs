@@ -17,7 +17,7 @@ pub(crate) fn series_min(series: &[f64]) -> f64 {
 ///
 /// * `run_off`: The run-off data.
 ///
-/// returns: (Vec<f64>, Vec<f64>) The probability of exceedence (0-190) and the sorted run-off data.
+/// returns: (`Vec<f64>`,` Vec<f64>`) The probability of exceedence (0-190) and the sorted run-off data.
 pub fn calculate_fdc(run_off: &[f64]) -> (Vec<f64>, Vec<f64>) {
     let exceedence = Array::range(1., run_off.len() as f64 + 1.0, 1.0) / run_off.len() as f64 * 100.0;
 
@@ -42,7 +42,7 @@ impl NaNVec<'_> {
     ///
     /// * `vec`: The vector to sort.
     ///
-    /// returns: Vec<f64>
+    /// returns: `Vec<f64>`
     pub fn sort(&self, sort_type: SortType) -> Vec<f64> {
         let mut sorted_vec: Vec<f64> = (*self.0).to_vec().clone();
         sorted_vec.sort_by(|x: &f64, y: &f64| y.total_cmp(x));
@@ -61,7 +61,7 @@ impl NaNVec<'_> {
     ///
     /// returns: f64
     pub fn mean(&self) -> f64 {
-        let nan_free_vec = self.remove_nans_from_vec();
+        let nan_free_vec = self.remove_nans();
         let total = nan_free_vec.len() as f64;
         let sum: f64 = nan_free_vec.into_iter().sum();
         sum / total
@@ -74,7 +74,7 @@ impl NaNVec<'_> {
     /// * `vec`: The vector to reduce.
     ///
     /// returns: Vec<&f64>
-    pub fn remove_nans_from_vec(&self) -> Vec<f64> {
+    pub fn remove_nans(&self) -> Vec<f64> {
         self.0.iter().copied().filter(|x| !x.is_nan()).collect()
     }
 
@@ -85,7 +85,7 @@ impl NaNVec<'_> {
     /// * `vec`: The vector.
     /// * `vec2`: The second vector.
     ///
-    /// returns: Vec<f64>
+    /// returns: `Vec<f64>`
     pub fn log(&self) -> Vec<f64> {
         let mut log_numbers: Vec<f64> = vec![];
         for n in self.0.iter() {
@@ -101,7 +101,7 @@ impl NaNVec<'_> {
     ///
     /// * `x`: The vector with the data to rank.
     ///
-    /// returns: Vec<f64>
+    /// returns: `Vec<f64>`
     pub fn rank(&self) -> Vec<f64> {
         let n = self.0.len();
         let mut rank: Vec<f64> = vec![];
@@ -140,7 +140,7 @@ impl NaNVec<'_> {
     ///
     /// returns: f64
     pub fn spearman(&self, y: &[f64]) -> f64 {
-        let (x, y) = self.remove_nans_from_vec_pair(y).unwrap();
+        let (x, y) = self.remove_nans_from_pair(y).unwrap();
         let n = x.len() as f64;
 
         let x_rank = self.rank();
@@ -160,7 +160,7 @@ impl NaNVec<'_> {
     /// * `y`: The second vector.
     ///
     /// returns: Result<(Vec<&f64, Global>, Vec<&f64, Global>), &str>
-    pub fn remove_nans_from_vec_pair<'a>(&self, y: &[f64]) -> Result<(Vec<f64>, Vec<f64>), &'a str> {
+    pub fn remove_nans_from_pair<'a>(&self, y: &[f64]) -> Result<(Vec<f64>, Vec<f64>), &'a str> {
         if self.0.len() != y.len() {
             return Err("The vector must have the same length");
         }

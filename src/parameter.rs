@@ -4,7 +4,7 @@ use std::fmt::{Debug, Formatter};
 /// Six free parameters for a GR6J model
 #[derive(Debug, Copy, Clone)]
 pub enum Parameter {
-    // Maximum capacity of the production store (mm/day)
+    /// Maximum capacity of the production store (mm/day)
     X1(f64),
     /// Inter-catchment (or groundwater) exchange coefficient (mm/day). X2 can be positive
     /// or negative to simulate imports or exports of water with deep aquifers or

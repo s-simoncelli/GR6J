@@ -101,7 +101,7 @@ impl GR6JModel {
     ///
     /// * `inputs`: The `GR6JModelInputs` struct containing the model input data.
     ///
-    /// returns: Vec<GR6JModel>
+    /// returns: `Vec<GR6JModel>`
     ///
     /// # Examples
     ///
