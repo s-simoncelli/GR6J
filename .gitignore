@@ -1,4 +1,5 @@
-/target
-examples/results
-src/test_data/.*
+gr6j-core/examples/results
+gr6j-core/src/test_data/.RData
+gr6j-core/src/test_data/.Rhistory
 .idea
+target

@@ -1,0 +1,19 @@
+[package]
+name = "gr6j-core"
+version = "0.1.0"
+authors = ["Stefano Simoncelli"]
+edition = "2021"
+
+[lib]
+name = "gr6j"
+
+[dependencies]
+chrono = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+plotters = { workspace = true }
+csv = { workspace = true }
+ndarray = { workspace = true }
+ordered-float = { workspace = true }
+float-cmp = { workspace = true }
