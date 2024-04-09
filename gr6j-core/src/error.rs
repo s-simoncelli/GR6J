@@ -1,4 +1,11 @@
+use chrono::NaiveDate;
 use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ModelPeriodError {
+    #[error("The end {0} date must be smaller than the start date {1}")]
+    DateTooSmall(NaiveDate, NaiveDate),
+}
 
 #[derive(Error, Debug)]
 pub enum LoadModelError {
@@ -16,12 +23,14 @@ pub enum LoadModelError {
     TooFarWarmUpPeriod(String, String),
     #[error("The destination folder {0} does not exist")]
     DestinationNotFound(String),
-    #[error("The destination folder {0} cannot be created")]
-    DestinationNotWritable(String),
+    #[error("{0}")]
+    Generic(String),
 }
 
 #[derive(Error, Debug)]
 pub enum RunModelError {
+    #[error("The destination folder {0} cannot be created")]
+    DestinationNotWritable(String),
     #[error("The run-off conversion factor must be larger than 0")]
     WrongConversion(),
     #[error("The simulation end date was reached and the model cannot advanced anymore")]

@@ -1,3 +1,4 @@
+use crate::error::ModelPeriodError;
 use crate::parameter::Parameter;
 use chrono::NaiveDate;
 use std::fmt;
@@ -32,6 +33,15 @@ pub struct ModelPeriod {
     pub start: NaiveDate,
     /// The period end date
     pub end: NaiveDate,
+}
+
+impl ModelPeriod {
+    pub fn new(start: NaiveDate, end: NaiveDate) -> Result<Self, ModelPeriodError> {
+        if start >= end {
+            return Err(ModelPeriodError::DateTooSmall(start, end));
+        }
+        Ok(ModelPeriod { start, end })
+    }
 }
 
 impl Debug for ModelPeriod {
@@ -72,8 +82,9 @@ pub struct CatchmentData {
 }
 
 /// Convert the run-off to the desired unit of measurement
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum RunOffUnit {
+    #[default]
     /// Keep the run-off in mm*km2/d
     NoConversion,
     /// Convert the run-off to m³/d
@@ -82,12 +93,6 @@ pub enum RunOffUnit {
     MlPerDay,
     /// Convert the run-off to m³/s
     CubicMetrePerSecond,
-}
-
-impl Default for RunOffUnit {
-    fn default() -> Self {
-        Self::NoConversion
-    }
 }
 
 impl RunOffUnit {
@@ -112,7 +117,6 @@ impl RunOffUnit {
     }
 }
 
-// TODO add doc explaining how this works
 #[derive(Debug)]
 pub struct GR6JModelInputs {
     /// Vector of time
@@ -128,7 +132,7 @@ pub struct GR6JModelInputs {
     /// The start and end date of the model. The model can be run on a shorter time period
     /// compared to `time`
     pub run_period: ModelPeriod,
-    /// The start and end date of the warm-up period. If `None` and the `run_period.start` allows,
+    /// The start and end date of the warm-up period. If `None` and `run_period.start` allows,
     /// the one-year period preceding the `run_period.start` is used.
     pub warmup_period: Option<ModelPeriod>,
     /// Whether to export charts, the simulated run-off and other diagnostic file into a sub-folder

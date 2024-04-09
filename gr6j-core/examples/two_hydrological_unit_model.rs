@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 store_levels: None,
             },
         ]),
-        run_period: ModelPeriod { start, end },
+        run_period: ModelPeriod::new(start, end)?,
         warmup_period: None,
         destination: Some(Path::new(r"gr6j-core\examples\results").to_path_buf()),
         observed_runoff: Some(observed),
