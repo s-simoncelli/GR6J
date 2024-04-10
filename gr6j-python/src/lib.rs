@@ -1,3 +1,4 @@
+use ::gr6j::error::ModelPeriodError;
 use ::gr6j::inputs::{
     CatchmentData as RsCatchmentData, CatchmentType as RsCatchmentType, GR6JModelInputs as RsGR6JModelInputs,
     ModelPeriod as RsModelPeriod, RunOffUnit as RsRunOffUnit, StoreLevels as RsStorelevels,
@@ -6,7 +7,7 @@ use ::gr6j::model::GR6JModel as RsGR6JModel;
 use ::gr6j::outputs::ModelStepData as RsModelStepData;
 use ::gr6j::parameter::Parameter;
 use chrono::NaiveDate;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use pyo3::PyTypeInfo;
@@ -132,12 +133,10 @@ struct ModelPeriod {
     end: NaiveDate,
 }
 
-impl From<ModelPeriod> for RsModelPeriod {
-    fn from(s: ModelPeriod) -> RsModelPeriod {
-        RsModelPeriod {
-            start: s.start,
-            end: s.end,
-        }
+impl TryFrom<ModelPeriod> for RsModelPeriod {
+    type Error = ModelPeriodError;
+    fn try_from(s: ModelPeriod) -> Result<Self, Self::Error> {
+        RsModelPeriod::new(s.start, s.end)
     }
 }
 
@@ -440,14 +439,27 @@ struct GR6JModel {
 impl GR6JModel {
     #[new]
     fn rs_new(inputs: GR6JModelInputs) -> PyResult<GR6JModel> {
-        let run_period: RsModelPeriod = inputs.run_period.clone().into();
+        let run_period: RsModelPeriod = inputs
+            .run_period
+            .clone()
+            .try_into()
+            .map_err(|e: ModelPeriodError| PyValueError::new_err(e.to_string()))?;
+
+        let warmup_period = match inputs.warmup_period {
+            None => None,
+            Some(p) => Some(
+                TryInto::<RsModelPeriod>::try_into(p)
+                    .map_err(|e: ModelPeriodError| PyValueError::new_err(e.to_string()))?,
+            ),
+        };
+
         let inputs = RsGR6JModelInputs {
             time: inputs.time,
             precipitation: inputs.precipitation,
             evapotranspiration: inputs.evapotranspiration,
             catchment: inputs.rs_catchment.into(),
-            run_period: inputs.run_period.into(),
-            warmup_period: inputs.warmup_period.map(|i| i.into()),
+            run_period,
+            warmup_period,
             destination: inputs.destination,
             observed_runoff: inputs.observed_runoff,
             run_off_unit: inputs.run_off_unit.unwrap_or_default().into(),
@@ -473,7 +485,10 @@ impl GR6JModel {
 
     /// Run the model
     fn run(&mut self) -> PyResult<GR6JOutputs> {
-        let results = self.rs_model.run().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        let results = self
+            .rs_model
+            .run()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
         let mut model_results: Vec<Vec<ModelStepData>> = vec![];
         for r in results.catchment_outputs.iter() {
