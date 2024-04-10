@@ -254,7 +254,7 @@ class GR6JModelOutputs:
     Fetch the results. To get the time and run-off vector as Pandas DataFrame use:
 
         results = model.run()
-        print(pd.DataFrame([results.time, result.run_off], columns=["Time", "Run off"]))
+        print(pd.DataFrame(zip(results.time, results.run_off), columns=["Time", "Run off"]))
 
     `self.catchment_data` contains the results for each sub-catchment or hydrological
     unit (HU) and time step. For example if you have two HU and want to get the
