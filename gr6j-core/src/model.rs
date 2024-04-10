@@ -101,7 +101,7 @@ impl GR6JModel {
     ///
     /// * `inputs`: The `GR6JModelInputs` struct containing the model input data.
     ///
-    /// returns: `Vec<GR6JModel>`
+    /// returns: `Result<Self, LoadModelError>`
     ///
     /// # Examples
     ///
@@ -162,10 +162,10 @@ impl GR6JModel {
 
                 if warmup_start >= inputs.time[0] {
                     // one year is available
-                    Some(ModelPeriod {
-                        start: warmup_start,
-                        end: warmup_end,
-                    })
+                    Some(
+                        ModelPeriod::new(warmup_start, warmup_end)
+                            .map_err(|e| LoadModelError::Generic(e.to_string()))?,
+                    )
                 } else if inputs.run_period.start > inputs.time[0] {
                     // reduced warm-up period
                     warn!(
@@ -173,10 +173,10 @@ impl GR6JModel {
                         will start from {} which is the first date in the time vector",
                         inputs.time[0]
                     );
-                    Some(ModelPeriod {
-                        start: inputs.time[0],
-                        end: warmup_end,
-                    })
+                    Some(
+                        ModelPeriod::new(inputs.time[0], warmup_end)
+                            .map_err(|e| LoadModelError::Generic(e.to_string()))?,
+                    )
                 } else {
                     // disregard warm-up period if there is no enough data
                     warn!("The input data is too short to define a warm-up period");
@@ -214,10 +214,6 @@ impl GR6JModel {
                 return Err(LoadModelError::DestinationNotFound(dest.to_str().unwrap().to_string()));
             }
             let destination = dest.join(Local::now().format("%Y%m%d_%H%M").to_string());
-            if !destination.exists() {
-                create_dir(&destination)
-                    .map_err(|_| LoadModelError::DestinationNotWritable(destination.to_str().unwrap().to_string()))?;
-            }
             Some(destination)
         } else {
             None
@@ -241,6 +237,19 @@ impl GR6JModel {
             CatchmentType::OneCatchment(data) => vec![data],
             CatchmentType::SubCatchments(data_vec) => data_vec,
         };
+
+        // check the input data
+        if precipitation.iter().any(|&i| i.is_nan()) {
+            return Err(LoadModelError::NanData("precipitation".to_string()));
+        }
+        if evapotranspiration.iter().any(|&i| i.is_nan()) {
+            return Err(LoadModelError::NanData("evapo-transpiration".to_string()));
+        }
+        if let Some(ref o) = observed {
+            if o.iter().any(|&i| i.is_nan()) {
+                return Err(LoadModelError::NanData("observed run-off".to_string()));
+            }
+        }
 
         let mut models: Vec<ModelData> = vec![];
         for catchment_data in catchments_data.iter() {
@@ -305,6 +314,13 @@ impl GR6JModel {
     }
 
     pub fn run(&mut self) -> Result<GR6JOutputs, RunModelError> {
+        if let Some(destination) = &self.destination {
+            if !destination.exists() {
+                create_dir(destination)
+                    .map_err(|_| RunModelError::DestinationNotWritable(destination.to_str().unwrap().to_string()))?;
+            }
+        }
+
         let mut catchment_outputs: Vec<ModelStepDataVector> = vec![];
         for model_index in 0..self.models.len() {
             let mut outputs: Vec<ModelStepData> = vec![];
@@ -455,6 +471,7 @@ impl GR6JModel {
 
         let p = self.precipitation[step];
         let e = self.evapotranspiration[step];
+
         let storage_ratio = self.models[model_index].state.store_levels.production_store / x1;
 
         // update production store level
@@ -815,7 +832,7 @@ mod tests {
             precipitation,
             evapotranspiration,
             catchment: CatchmentType::OneCatchment(catchment_data),
-            run_period: ModelPeriod { start, end },
+            run_period: ModelPeriod::new(start, end).unwrap(),
             warmup_period: None,
             destination: None,
             observed_runoff: None,
@@ -871,10 +888,7 @@ mod tests {
             precipitation: vec![0.0; t.len()],
             evapotranspiration: vec![0.0; t.len()],
             catchment: CatchmentType::OneCatchment(catchment_data),
-            run_period: ModelPeriod {
-                start: t[0],
-                end: t[365],
-            },
+            run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
             observed_runoff: None,
@@ -911,10 +925,7 @@ mod tests {
             precipitation: vec![0.0; t.len() - 10],
             evapotranspiration: vec![0.0; t.len()],
             catchment: CatchmentType::OneCatchment(catchment_data),
-            run_period: ModelPeriod {
-                start: t[0],
-                end: t[365],
-            },
+            run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
             observed_runoff: None,
@@ -946,10 +957,7 @@ mod tests {
             precipitation: vec![0.0; t.len()],
             evapotranspiration: vec![0.0; t.len() - 10],
             catchment: CatchmentType::OneCatchment(catchment_data),
-            run_period: ModelPeriod {
-                start: t[0],
-                end: t[365],
-            },
+            run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
             observed_runoff: None,
@@ -981,10 +989,7 @@ mod tests {
             precipitation: vec![0.0; t.len()],
             evapotranspiration: vec![0.0; t.len()],
             catchment: CatchmentType::OneCatchment(catchment_data),
-            run_period: ModelPeriod {
-                start: t[0],
-                end: t[365],
-            },
+            run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
             observed_runoff: None,
@@ -1015,10 +1020,7 @@ mod tests {
             precipitation: vec![0.0; t.len()],
             evapotranspiration: vec![0.0; t.len()],
             catchment: CatchmentType::OneCatchment(catchment_data),
-            run_period: ModelPeriod {
-                start: NaiveDate::from_ymd_opt(1999, 1, 1).unwrap(),
-                end: t[365],
-            },
+            run_period: ModelPeriod::new(NaiveDate::from_ymd_opt(1999, 1, 1).unwrap(), t[365]).unwrap(),
             warmup_period: None,
             destination: None,
             observed_runoff: None,
@@ -1029,6 +1031,44 @@ mod tests {
             model.unwrap_err().to_string(),
             "The run start date must be larger or equal to the first date in the time vector".to_string()
         )
+    }
+
+    #[test]
+    fn test_nan_values() {
+        let t0 = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+        let mut t: Vec<NaiveDate> = vec![t0; 366];
+        for (d, date) in t.iter_mut().enumerate() {
+            *date += TimeDelta::try_days(d as i64).unwrap();
+        }
+
+        let mut p = vec![0.0; t.len()];
+        p[0] = f64::NAN;
+        let catchment_data = CatchmentData {
+            area: 1.0,
+            x1: Parameter::X1(0.4),
+            x2: Parameter::X2(0.0),
+            x3: Parameter::X3(0.4),
+            x4: Parameter::X4(0.6),
+            x5: Parameter::X5(0.0),
+            x6: Parameter::X6(0.4),
+            store_levels: None,
+        };
+        let inputs = GR6JModelInputs {
+            time: t.clone(),
+            precipitation: p,
+            evapotranspiration: vec![0.0; t.len()],
+            catchment: CatchmentType::OneCatchment(catchment_data),
+            run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
+            warmup_period: None,
+            destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
+        };
+        let model = GR6JModel::new(inputs);
+        assert_eq!(
+            model.unwrap_err().to_string(),
+            "The precipitation series contains at least one NA value. Missing values are not allowed".to_string()
+        );
     }
 
     #[test]
@@ -1157,7 +1197,7 @@ mod tests {
             precipitation,
             evapotranspiration,
             catchment: CatchmentType::SubCatchments(vec![hu1, hu2]),
-            run_period: ModelPeriod { start, end },
+            run_period: ModelPeriod::new(start, end).unwrap(),
             warmup_period: None,
             destination: None,
             observed_runoff: None,

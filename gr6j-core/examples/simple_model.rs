@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::builder().filter_level(LevelFilter::Info).init();
 
     // Collect hydrological data
-    let file = File::open(r"src\test_data\airGR_L0123001_dataset.csv")?;
+    let file = File::open(r"gr6j-core\src\test_data\airGR_L0123001_dataset.csv")?;
     let mut rdr = csv::Reader::from_reader(file);
 
     let mut time: Vec<NaiveDate> = vec![];
@@ -49,9 +49,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             x6: Parameter::X6(5.3),
             store_levels: None,
         }),
-        run_period: ModelPeriod { start, end },
+        run_period: ModelPeriod::new(start, end)?,
         warmup_period: None,
-        destination: Some(Path::new(r"./examples/results").to_path_buf()),
+        destination: Some(Path::new(r"./gr6j-core/examples/results").to_path_buf()),
         observed_runoff: Some(observed),
         run_off_unit: RunOffUnit::NoConversion,
     };

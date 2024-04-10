@@ -1,0 +1,14 @@
+[package]
+name = "gr6j-python"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "gr6j"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+#pyo3-log = { workspace = true }
+gr6j-core = { path = "../gr6j-core" }
+chrono = { workspace = true }

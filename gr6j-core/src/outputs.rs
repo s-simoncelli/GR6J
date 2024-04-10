@@ -2,7 +2,7 @@ use crate::inputs::StoreLevels;
 use chrono::NaiveDate;
 
 /// Outputs from a model time-step (one day)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ModelStepData {
     /// The time
     pub time: NaiveDate,
@@ -12,7 +12,7 @@ pub struct ModelStepData {
     pub precipitation: f64,
     /// Net rainfall (mm)
     pub net_rainfall: f64,
-    // The store levels
+    /// The store levels
     pub store_levels: StoreLevels,
     /// part of the precipitation filling the production store (mm)
     pub storage_p: f64,

@@ -1,21 +1,17 @@
-[package]
-name = "gr6j"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = ["gr6j-core", "gr6j-python"]
+default-members = ["gr6j-core", "gr6j-python"]
 
-[lib]
-name = "gr6j"
-#crate-type = ["cdylib"]
-
-[dependencies]
-#pyo3 = { version = "0.21.0", features = ["extension-module"] }
+[workspace.dependencies]
+pyo3 = { version = "0.21.1", features = ["extension-module", "chrono"] }
+#pyo3-log = "0.9.0"
 chrono = { version = "0.4.34" }
 thiserror = "1.0.58"
 log = "0.4.21"
 env_logger = "0.11.3"
 # TODO master includes unreleased bugfixes
 plotters = { git = "https://github.com/plotters-rs/plotters/" }
-#plotters = "0.3.5"
 csv = "1.3.0"
 ndarray = "0.15.6"
 ordered-float = "4.2.0"
