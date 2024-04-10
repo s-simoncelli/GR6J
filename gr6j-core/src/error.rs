@@ -23,6 +23,8 @@ pub enum LoadModelError {
     TooFarWarmUpPeriod(String, String),
     #[error("The destination folder {0} does not exist")]
     DestinationNotFound(String),
+    #[error("The {0} series contains at least one NA value. Missing values are not allowed")]
+    NanData(String),
     #[error("{0}")]
     Generic(String),
 }

@@ -238,6 +238,19 @@ impl GR6JModel {
             CatchmentType::SubCatchments(data_vec) => data_vec,
         };
 
+        // check the input data
+        if precipitation.iter().any(|&i| i.is_nan()) {
+            return Err(LoadModelError::NanData("precipitation".to_string()));
+        }
+        if evapotranspiration.iter().any(|&i| i.is_nan()) {
+            return Err(LoadModelError::NanData("evapo-transpiration".to_string()));
+        }
+        if let Some(ref o) = observed {
+            if o.iter().any(|&i| i.is_nan()) {
+                return Err(LoadModelError::NanData("observed run-off".to_string()));
+            }
+        }
+
         let mut models: Vec<ModelData> = vec![];
         for catchment_data in catchments_data.iter() {
             // check parameters
@@ -458,6 +471,7 @@ impl GR6JModel {
 
         let p = self.precipitation[step];
         let e = self.evapotranspiration[step];
+
         let storage_ratio = self.models[model_index].state.store_levels.production_store / x1;
 
         // update production store level
@@ -1017,6 +1031,44 @@ mod tests {
             model.unwrap_err().to_string(),
             "The run start date must be larger or equal to the first date in the time vector".to_string()
         )
+    }
+
+    #[test]
+    fn test_nan_values() {
+        let t0 = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+        let mut t: Vec<NaiveDate> = vec![t0; 366];
+        for (d, date) in t.iter_mut().enumerate() {
+            *date += TimeDelta::try_days(d as i64).unwrap();
+        }
+
+        let mut p = vec![0.0; t.len()];
+        p[0] = f64::NAN;
+        let catchment_data = CatchmentData {
+            area: 1.0,
+            x1: Parameter::X1(0.4),
+            x2: Parameter::X2(0.0),
+            x3: Parameter::X3(0.4),
+            x4: Parameter::X4(0.6),
+            x5: Parameter::X5(0.0),
+            x6: Parameter::X6(0.4),
+            store_levels: None,
+        };
+        let inputs = GR6JModelInputs {
+            time: t.clone(),
+            precipitation: p,
+            evapotranspiration: vec![0.0; t.len()],
+            catchment: CatchmentType::OneCatchment(catchment_data),
+            run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
+            warmup_period: None,
+            destination: None,
+            observed_runoff: None,
+            run_off_unit: RunOffUnit::NoConversion,
+        };
+        let model = GR6JModel::new(inputs);
+        assert_eq!(
+            model.unwrap_err().to_string(),
+            "The precipitation series contains at least one NA value. Missing values are not allowed".to_string()
+        );
     }
 
     #[test]
