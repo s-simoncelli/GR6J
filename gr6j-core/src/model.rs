@@ -302,8 +302,10 @@ impl GR6JModel {
 
     pub fn run(&mut self) -> Result<GR6JOutputs, RunModelError> {
         if let Some(destination) = &self.destination {
-            create_dir(destination)
-                .map_err(|_| RunModelError::DestinationNotWritable(destination.to_str().unwrap().to_string()))?;
+            if !destination.exists() {
+                create_dir(destination)
+                    .map_err(|_| RunModelError::DestinationNotWritable(destination.to_str().unwrap().to_string()))?;
+            }
         }
 
         let mut catchment_outputs: Vec<ModelStepDataVector> = vec![];

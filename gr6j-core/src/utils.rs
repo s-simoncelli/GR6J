@@ -3,12 +3,18 @@ use ndarray::Array;
 
 /// Get the series max value
 pub(crate) fn series_max(series: &[f64]) -> f64 {
-    *series.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap()
+    *series
+        .iter()
+        .max_by(|a, b| a.total_cmp(b))
+        .expect("Cannot calculated max value")
 }
 
 /// Get the series min value
 pub(crate) fn series_min(series: &[f64]) -> f64 {
-    *series.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap()
+    *series
+        .iter()
+        .min_by(|a, b| a.total_cmp(b))
+        .expect("Cannot calculate min value")
 }
 
 /// Calculate the flow duration curve.
