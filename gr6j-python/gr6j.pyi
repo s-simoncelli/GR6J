@@ -212,6 +212,68 @@ class GR6JModelInputs:
         Default to None.
         """
 
+class ModelStepData:
+    time: date
+    """ The time """
+    evapotranspiration: float
+    """ The potential evapotranspiration (PE) (mm) """
+    precipitation: float
+    """ The total precipitation (mm) """
+    net_rainfall: float
+    """ Net rainfall (mm) """
+    store_levels: StoreLevels
+    """ The store levels """
+    storage_p: float
+    """ Part of the precipitation filling the production store (mm) """
+    actual_evapotranspiration: float
+    """ Actual evapotranspiration """
+    percolation: float
+    """ Catchment percolation (mm) """
+    pr: float
+    """ `self.net_rainfall` - `self.storage_p` + `self.percolation` (mm) """
+    exchange: float
+    """ Potential third-exchange between catchments (mm) """
+    exchange_from_routing_store: float
+    """ Actual exchange between catchments from routing store (mm) """
+    exchange_from_direct_branch: float
+    """ Actual exchange between catchments from direct branch (after UH2) (mm) """
+    actual_exchange: float
+    """ Actual total exchange between catchments [`self.exchange_from_routing_store`] +
+     [`self.exchange_from_direct_branch`] + [`self.exchange`] (mm) """
+    routing_store_outflow: float
+    """ Outflow from routing store (mm) """
+    exponential_store_outflow: float
+    """ Outflow from exponential store (mm) """
+    outflow_from_uh2_branch: float
+    """ Outflow from UH2 branch after exchange (mm) """
+    run_off: float
+    """ Simulated outflow at catchment outlet (mm) """
+
+class GR6JModelOutputs:
+    """
+    Fetch the results. To get the time and run-off vector as Pandas DataFrame use:
+
+        results = model.run()
+        print(pd.DataFrame([results.time, result.run_off], columns=["Time", "Run off"]))
+
+    `self.catchment_data` contains the results for each sub-catchment or hydrological
+    unit (HU) and time step. For example if you have two HU and want to get the
+    "exchange from routing store" for the second model and third time step use:
+
+        print(results.catchment_outputs[1][2].exchange_from_routing_store)
+
+    """
+
+    time: list[date]
+    """ The time vector as a list of `date` objects. """
+    run_off: list[float]
+    """ The simulated run off as a list of floats. """
+    catchment_outputs: list[list[ModelStepData]]
+    """ A list of the data at each simulation time step. Each list item contains the 
+    results for each sub-catchment or hydrological unit (with one catchment there is 
+    only one list). Each nested list contains the results (as instances of 
+    `ModelStepData`) for each time steps for the sub-model. """
+
 class GR6JModel:
     """
     Load and run a GR6J model.
@@ -223,8 +285,9 @@ class GR6JModel:
         :param input: The input data. See GR6JModelInputs how to build this class.
         """
 
-    def run(self) -> None:
+    def run(self) -> GR6JModelOutputs:
         """
         Run the model and export charts and outputs.
-        :return: None
+        :return: A dictionary with the "time" and "run_off" keys containing the
+        simulated time and run off values.
         """

@@ -3,6 +3,7 @@ use ::gr6j::inputs::{
     ModelPeriod as RsModelPeriod, RunOffUnit as RsRunOffUnit, StoreLevels as RsStorelevels,
 };
 use ::gr6j::model::GR6JModel as RsGR6JModel;
+use ::gr6j::outputs::ModelStepData as RsModelStepData;
 use ::gr6j::parameter::Parameter;
 use chrono::NaiveDate;
 use pyo3::exceptions::PyValueError;
@@ -12,14 +13,11 @@ use pyo3::PyTypeInfo;
 use std::fmt::Debug;
 use std::path::PathBuf;
 
-#[pyclass]
+#[pyclass(get_all)]
 #[derive(Debug, Clone, Copy)]
 struct StoreLevels {
-    #[pyo3(get)]
     production_store: f64,
-    #[pyo3(get)]
     routing_store: f64,
-    #[pyo3(get)]
     exponential_store: f64,
 }
 
@@ -56,24 +54,16 @@ impl StoreLevels {
     }
 }
 
-#[pyclass]
+#[pyclass(get_all)]
 #[derive(Clone)]
 struct CatchmentData {
-    #[pyo3(get)]
     area: f64,
-    #[pyo3(get)]
     x1: f64,
-    #[pyo3(get)]
     x2: f64,
-    #[pyo3(get)]
     x3: f64,
-    #[pyo3(get)]
     x4: f64,
-    #[pyo3(get)]
     x5: f64,
-    #[pyo3(get)]
     x6: f64,
-    #[pyo3(get)]
     store_levels: Option<StoreLevels>,
 }
 
@@ -135,12 +125,10 @@ impl CatchmentData {
     }
 }
 
-#[pyclass]
+#[pyclass(get_all)]
 #[derive(Clone, Debug)]
 struct ModelPeriod {
-    #[pyo3(get)]
     start: NaiveDate,
-    #[pyo3(get)]
     end: NaiveDate,
 }
 
@@ -360,6 +348,88 @@ impl GR6JModelInputs {
     }
 }
 
+#[pyclass(get_all)]
+#[derive(Clone)]
+struct ModelStepData {
+    time: NaiveDate,
+    evapotranspiration: f64,
+    precipitation: f64,
+    net_rainfall: f64,
+    store_levels: StoreLevels,
+    storage_p: f64,
+    actual_evapotranspiration: f64,
+    percolation: f64,
+    pr: f64,
+    exchange: f64,
+    exchange_from_routing_store: f64,
+    exchange_from_direct_branch: f64,
+    actual_exchange: f64,
+    routing_store_outflow: f64,
+    exponential_store_outflow: f64,
+    outflow_from_uh2_branch: f64,
+    run_off: f64,
+}
+
+impl ModelStepData {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("ModelStepData(t={})", self.time,))
+    }
+
+    fn __str__(&self) -> String {
+        self.__repr__().unwrap()
+    }
+}
+
+impl From<RsModelStepData> for ModelStepData {
+    fn from(value: RsModelStepData) -> Self {
+        ModelStepData {
+            time: value.time,
+            evapotranspiration: value.evapotranspiration,
+            precipitation: value.precipitation,
+            net_rainfall: value.net_rainfall,
+            store_levels: StoreLevels {
+                production_store: value.store_levels.production_store,
+                exponential_store: value.store_levels.exponential_store,
+                routing_store: value.store_levels.routing_store,
+            },
+            storage_p: value.storage_p,
+            actual_evapotranspiration: value.actual_evapotranspiration,
+            percolation: value.percolation,
+            pr: value.pr,
+            exchange: value.exchange,
+            exchange_from_routing_store: value.exchange_from_routing_store,
+            exchange_from_direct_branch: value.exchange_from_direct_branch,
+            actual_exchange: value.actual_exchange,
+            routing_store_outflow: value.routing_store_outflow,
+            exponential_store_outflow: value.exponential_store_outflow,
+            outflow_from_uh2_branch: value.outflow_from_uh2_branch,
+            run_off: value.run_off,
+        }
+    }
+}
+
+#[pyclass(get_all)]
+struct GR6JOutputs {
+    catchment_outputs: Vec<Vec<ModelStepData>>,
+    time: Vec<NaiveDate>,
+    run_off: Vec<f64>,
+}
+
+impl GR6JOutputs {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
+            "GR6JOutputs with {} time steps (from={},to={})",
+            self.time.len(),
+            self.time.first().unwrap(),
+            self.time.last().unwrap()
+        ))
+    }
+
+    fn __str__(&self) -> String {
+        self.__repr__().unwrap()
+    }
+}
+
 #[pyclass]
 struct GR6JModel {
     rs_model: RsGR6JModel,
@@ -402,10 +472,24 @@ impl GR6JModel {
     }
 
     /// Run the model
-    fn run(&mut self) {
-        self.rs_model.run().unwrap();
+    fn run(&mut self) -> PyResult<GR6JOutputs> {
+        let results = self.rs_model.run().map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        //     TODO remap error and convert to Py class
+        let mut model_results: Vec<Vec<ModelStepData>> = vec![];
+        for r in results.catchment_outputs.iter() {
+            model_results.push(
+                r.0.to_vec()
+                    .iter()
+                    .map(|x| Into::<ModelStepData>::into(x.clone()))
+                    .collect(),
+            );
+        }
+
+        Ok(GR6JOutputs {
+            catchment_outputs: model_results,
+            time: results.time,
+            run_off: results.run_off,
+        })
     }
 }
 
