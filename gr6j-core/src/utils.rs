@@ -65,13 +65,29 @@ impl NaNVec<'_> {
         sum / total
     }
 
+    /// Calculate the standard deviation of a vector and excludes NaN values.
+    ///
+    /// # Arguments
+    ///
+    /// * `vec`: The vector to calculate the standard deviation of.
+    ///
+    /// returns: f64
+    pub fn std(&self) -> f64 {
+        let nan_free_vec = self.remove_nans();
+        let total = nan_free_vec.len() as f64;
+        let mean = self.mean();
+
+        let delta_sum: f64 = nan_free_vec.iter().map(|&x| (x - mean).powi(2)).sum();
+        (delta_sum / total).powf(0.5)
+    }
+
     /// Removed NaNs from a vector.
     ///
     /// # Arguments
     ///
     /// * `vec`: The vector to reduce.
     ///
-    /// returns: Vec<&f64>
+    /// returns: Vec<f64>
     pub fn remove_nans(&self) -> Vec<f64> {
         self.0.iter().copied().filter(|x| !x.is_nan()).collect()
     }
@@ -157,7 +173,7 @@ impl NaNVec<'_> {
     ///
     /// * `y`: The second vector.
     ///
-    /// returns: Result<(Vec<&f64, Global>, Vec<&f64, Global>), &str>
+    /// returns: Result<(Vec<f64>, Vec<f64>), &str>
     pub fn remove_nans_from_pair<'a>(&self, y: &[f64]) -> Result<(Vec<f64>, Vec<f64>), &'a str> {
         if self.0.len() != y.len() {
             return Err("The vector must have the same length");
@@ -213,7 +229,14 @@ mod test {
     }
 
     #[test]
-    fn test_spearman_corr() {
+    fn test_spearman_corr_1() {
         assert_approx_eq!(f64, NaNVec(&X).spearman(&Y), -0.17575757575757578, MARGINS);
+    }
+
+    #[test]
+    fn test_spearman_corr_2() {
+        let a = vec![1250.0, 0.3, 500.0, 5.2, 2.0, 10.0];
+        let b = vec![150.0, 0.03, 200.0, 5.2, 20.0, 15.0];
+        assert_approx_eq!(f64, NaNVec(&a).spearman(&b), 0.7714285714285715, MARGINS);
     }
 }

@@ -2,6 +2,12 @@ use crate::utils::NaNVec;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 
+/// The method to use to calculate the Kling-Gupta coefficient
+pub enum KlingGuptaMethod {
+    Y2009,
+    Y2012,
+}
+
 pub enum CalibrationMetric {
     /// The Nash-Sutcliffe efficiency. An efficiency of 1 gives a perfect match of simulated to
     /// observed data. An efficiency of 0 indicates that the model predictions are as accurate as
@@ -52,12 +58,12 @@ impl CalibrationMetric {
         }
 
         let v = match self {
-            CalibrationMetric::NashSutcliffe => Self::nse(observed, &simulated),
+            CalibrationMetric::NashSutcliffe => Self::nse(observed, simulated),
             CalibrationMetric::LogNashSutcliffe => {
                 Self::nse(NaNVec(observed).log().as_slice(), NaNVec(simulated).log().as_slice())
             }
-            CalibrationMetric::KlingGupta2009 => !todo!(),
-            CalibrationMetric::KlingGupta2012 => !todo!(),
+            CalibrationMetric::KlingGupta2009 => Self::kge(observed, simulated, KlingGuptaMethod::Y2009),
+            CalibrationMetric::KlingGupta2012 => Self::kge(observed, simulated, KlingGuptaMethod::Y2012),
         };
         Ok(v)
     }
@@ -84,6 +90,35 @@ impl CalibrationMetric {
         }
 
         1.0 - n / d
+    }
+
+    /// Calculate the Kling-Gupta coefficient. A perfect model simulation returns 1.0.
+    ///
+    /// # Arguments
+    ///
+    /// * `observed`: The vector of observed data.
+    /// * `simulated`: The vector of simulated values.
+    /// * `method`: The method to use.
+    ///
+    /// returns: f64
+    fn kge(observed: &[f64], simulated: &[f64], method: KlingGuptaMethod) -> f64 {
+        // remove NaNs from both vectors
+        let (observed, simulated) = NaNVec(observed).remove_nans_from_pair(simulated).unwrap();
+
+        let obs = NaNVec(observed.as_slice());
+        let sim = NaNVec(simulated.as_slice());
+        let r = obs.spearman(simulated.as_slice());
+
+        let obs_mean = obs.mean();
+        let sim_mean = sim.mean();
+        let beta = sim_mean / obs_mean;
+
+        let alpha = match method {
+            KlingGuptaMethod::Y2009 => sim.std() / obs.std(),
+            KlingGuptaMethod::Y2012 => (sim.std() / sim_mean) / (obs.std() / obs_mean),
+        };
+
+        1.0 - ((r - 1.0).powi(2) + (alpha - 1.0).powi(2) + (beta - 1.0).powi(2)).powf(0.5)
     }
 }
 
@@ -160,12 +195,73 @@ mod tests {
             MARGINS
         );
     }
+
     #[test]
     fn test_log_nse_metric_with_nan_2() {
         assert_approx_eq!(
             f64,
             CalibrationMetric::LogNashSutcliffe.value(&A_NAN, &B_NAN).unwrap(),
             0.6176288105498396,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_log_kg_2009_metric() {
+        assert_approx_eq!(
+            f64,
+            CalibrationMetric::KlingGupta2009.value(&A, &B).unwrap(),
+            -0.16047005836641337,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_log_kg_2009_metric_with_nan_1() {
+        assert_approx_eq!(
+            f64,
+            CalibrationMetric::KlingGupta2009.value(&A_NAN, &B).unwrap(),
+            0.13079945561027917,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_log_kg_2009_metric_with_nan_2() {
+        assert_approx_eq!(
+            f64,
+            CalibrationMetric::KlingGupta2009.value(&A_NAN, &B_NAN).unwrap(),
+            0.1481643733978315,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_log_kg_2012_metric() {
+        assert_approx_eq!(
+            f64,
+            CalibrationMetric::KlingGupta2012.value(&A, &B).unwrap(),
+            0.15721037908744573,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_log_kg_2012_metric_with_nan_1() {
+        assert_approx_eq!(
+            f64,
+            CalibrationMetric::KlingGupta2012.value(&A_NAN, &B).unwrap(),
+            0.3625714406316686,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_log_kg_2012_metric_with_nan_2() {
+        assert_approx_eq!(
+            f64,
+            CalibrationMetric::KlingGupta2012.value(&A_NAN, &B_NAN).unwrap(),
+            0.3950431057298418,
             MARGINS
         );
     }
