@@ -1,6 +1,4 @@
 use crate::utils::NaNVec;
-use std::fmt;
-use std::fmt::{Debug, Formatter};
 
 /// The method to use to calculate the Kling-Gupta coefficient
 pub enum KlingGuptaMethod {
@@ -8,6 +6,7 @@ pub enum KlingGuptaMethod {
     Y2012,
 }
 
+#[derive(Clone, Copy)]
 pub enum CalibrationMetricType {
     /// The Nash-Sutcliffe efficiency. An efficiency of 1 gives a perfect match of simulated to
     /// observed data. An efficiency of 0 indicates that the model predictions are as accurate as
@@ -28,9 +27,13 @@ pub struct CalibrationMetric<'a> {
 }
 
 impl<'a> CalibrationMetric<'a> {
-    pub fn new(observed: &'a [f64], simulated: &'a [f64]) -> Result<Self, &'a str> {
+    pub fn new(observed: &'a [f64], simulated: &'a [f64]) -> Result<Self, String> {
         if observed.len() != simulated.len() {
-            return Err("The vector must have the same length");
+            return Err(format!(
+                "The vector must have the same length. Observed has {} values and simulated has {} values",
+                observed.len(),
+                simulated.len()
+            ));
         }
 
         Ok(Self { observed, simulated })
@@ -43,10 +46,10 @@ impl<'a> CalibrationMetric<'a> {
     /// * `metric_type`: The type of metric.
     ///
     /// returns: &str
-    fn full_name(metric_type: CalibrationMetricType) -> &'a str {
+    pub fn full_name(metric_type: CalibrationMetricType) -> &'a str {
         match metric_type {
             CalibrationMetricType::NashSutcliffe => "Nash-Sutcliffe",
-            CalibrationMetricType::LogNashSutcliffe => "Nash-Sutcliffe for log flows",
+            CalibrationMetricType::LogNashSutcliffe => "Nash-Sutcliffe with log flows",
             CalibrationMetricType::KlingGupta2009 => "Ling-Gupta (2009)",
             CalibrationMetricType::KlingGupta2012 => "Ling-Gupta (2012)",
         }

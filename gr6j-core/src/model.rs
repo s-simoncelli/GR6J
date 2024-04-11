@@ -1,6 +1,7 @@
 use crate::chart::{generate_fdc_chart, generate_summary_chart, FDCData};
 use crate::error::{LoadModelError, RunModelError};
 use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
+use crate::metric::{CalibrationMetric, CalibrationMetricType};
 use crate::outputs::{GR6JOutputs, ModelStepData, ModelStepDataVector};
 use crate::parameter::Parameter;
 use crate::unit_hydrograph::{UnitHydrograph, UnitHydrographInputs, UnitHydrographType};
@@ -227,9 +228,13 @@ impl GR6JModel {
         let start_index = inputs.time.iter().position(|&r| r == start_date).unwrap();
         let end_index = inputs.time.iter().position(|&r| r == inputs.run_period.end).unwrap();
 
+        // include warm-up
         let time = inputs.time[start_index..end_index].to_owned();
         let precipitation = inputs.precipitation[start_index..end_index].to_owned();
         let evapotranspiration = inputs.evapotranspiration[start_index..end_index].to_owned();
+
+        // exclude warm-up
+        let start_index = inputs.time.iter().position(|&r| r == inputs.run_period.start).unwrap();
         let observed = inputs.observed_runoff.map(|q| q[start_index..end_index].to_owned());
 
         // Convert data for one catchment
@@ -443,6 +448,15 @@ impl GR6JModel {
             };
             generate_fdc_chart(self, sim_fdc, obs_fdc, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("fdc".to_string(), e.to_string()))?;
+
+            // Export metrics
+            if let Some(observed) = &self.observed {
+                let metric_dest = destination.join("Metrics.csv");
+                let metric = CalibrationMetric::new(observed, results.run_off.as_ref()).unwrap();
+                self.write_metric_file(metric, &metric_dest).map_err(|e| {
+                    RunModelError::CannotExportCsv(metric_dest.to_str().unwrap().to_string(), e.to_string())
+                })?;
+            }
         }
 
         Ok(results)
@@ -709,6 +723,36 @@ impl GR6JModel {
             data.x6.unit(),
             data.x6.description(),
         ])?;
+        wtr.flush()?;
+        Ok(())
+    }
+
+    /// Export the list of calibration metrics.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric`: The metric struct.
+    /// * `destination`: The path to the CSV file.
+    ///
+    /// returns: Result<(), csv::Error>
+    fn write_metric_file(&self, metric: CalibrationMetric, destination: &Path) -> Result<(), csv::Error> {
+        let mut wtr = Writer::from_path(destination)?;
+        wtr.write_record(["Metric", "Value", "Ideal value"])?;
+
+        let metric_types = [
+            CalibrationMetricType::NashSutcliffe,
+            CalibrationMetricType::LogNashSutcliffe,
+            CalibrationMetricType::KlingGupta2009,
+            CalibrationMetricType::KlingGupta2012,
+        ];
+        for metric_type in metric_types.into_iter() {
+            wtr.write_record([
+                CalibrationMetric::full_name(metric_type),
+                metric.value(metric_type).unwrap().to_string().as_str(),
+                CalibrationMetric::ideal_value(metric_type).to_string().as_str(),
+            ])?;
+        }
+
         wtr.flush()?;
         Ok(())
     }
