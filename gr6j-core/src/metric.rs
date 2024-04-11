@@ -8,7 +8,7 @@ pub enum KlingGuptaMethod {
     Y2012,
 }
 
-pub enum CalibrationMetric {
+pub enum CalibrationMetricType {
     /// The Nash-Sutcliffe efficiency. An efficiency of 1 gives a perfect match of simulated to
     /// observed data. An efficiency of 0 indicates that the model predictions are as accurate as
     /// the mean of the observations, whereas an efficiency less than zero occurs when the
@@ -22,25 +22,49 @@ pub enum CalibrationMetric {
     KlingGupta2012,
 }
 
-impl Debug for CalibrationMetric {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CalibrationMetric::NashSutcliffe => write!(f, "Nash-Sutcliffe"),
-            CalibrationMetric::LogNashSutcliffe => write!(f, "Nash-Sutcliffe for log flows"),
-            CalibrationMetric::KlingGupta2009 => write!(f, "Ling-Gupta (2009)"),
-            CalibrationMetric::KlingGupta2012 => write!(f, "Ling-Gupta (2012)"),
-        }
-    }
+pub struct CalibrationMetric<'a> {
+    observed: &'a [f64],
+    simulated: &'a [f64],
 }
 
-impl CalibrationMetric {
+impl<'a> CalibrationMetric<'a> {
+    pub fn new(observed: &'a [f64], simulated: &'a [f64]) -> Result<Self, &'a str> {
+        if observed.len() != simulated.len() {
+            return Err("The vector must have the same length");
+        }
+
+        Ok(Self { observed, simulated })
+    }
+
+    /// Get the metric full name.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_type`: The type of metric.
+    ///
+    /// returns: &str
+    fn full_name(metric_type: CalibrationMetricType) -> &'a str {
+        match metric_type {
+            CalibrationMetricType::NashSutcliffe => "Nash-Sutcliffe",
+            CalibrationMetricType::LogNashSutcliffe => "Nash-Sutcliffe for log flows",
+            CalibrationMetricType::KlingGupta2009 => "Ling-Gupta (2009)",
+            CalibrationMetricType::KlingGupta2012 => "Ling-Gupta (2012)",
+        }
+    }
+
     /// Get the ideal value for a metric.
-    pub fn ideal_value(&self) -> f64 {
-        match self {
-            CalibrationMetric::NashSutcliffe => 1.0,
-            CalibrationMetric::LogNashSutcliffe => 1.0,
-            CalibrationMetric::KlingGupta2009 => 1.0,
-            CalibrationMetric::KlingGupta2012 => 1.0,
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_type`: The type of metric.
+    ///
+    /// returns: &str
+    pub fn ideal_value(metric_type: CalibrationMetricType) -> f64 {
+        match metric_type {
+            CalibrationMetricType::NashSutcliffe => 1.0,
+            CalibrationMetricType::LogNashSutcliffe => 1.0,
+            CalibrationMetricType::KlingGupta2009 => 1.0,
+            CalibrationMetricType::KlingGupta2012 => 1.0,
         }
     }
 
@@ -48,22 +72,18 @@ impl CalibrationMetric {
     ///
     /// # Arguments
     ///
-    /// * `observed`: The time-series of observed values.  
-    /// * `simulated`: The time-series of simulated values.
+    /// * `metric_type`: The type of metric to calculate.  
     ///
     /// returns: f64
-    pub fn value(&self, observed: &[f64], simulated: &[f64]) -> Result<f64, &str> {
-        if observed.len() != simulated.len() {
-            return Err("The vector must have the same length");
-        }
-
-        let v = match self {
-            CalibrationMetric::NashSutcliffe => Self::nse(observed, simulated),
-            CalibrationMetric::LogNashSutcliffe => {
-                Self::nse(NaNVec(observed).log().as_slice(), NaNVec(simulated).log().as_slice())
-            }
-            CalibrationMetric::KlingGupta2009 => Self::kge(observed, simulated, KlingGuptaMethod::Y2009),
-            CalibrationMetric::KlingGupta2012 => Self::kge(observed, simulated, KlingGuptaMethod::Y2012),
+    pub fn value(&self, metric_type: CalibrationMetricType) -> Result<f64, &str> {
+        let v = match metric_type {
+            CalibrationMetricType::NashSutcliffe => Self::nse(self.observed, self.simulated),
+            CalibrationMetricType::LogNashSutcliffe => Self::nse(
+                NaNVec(self.observed).log().as_slice(),
+                NaNVec(self.simulated).log().as_slice(),
+            ),
+            CalibrationMetricType::KlingGupta2009 => Self::kge(self.observed, self.simulated, KlingGuptaMethod::Y2009),
+            CalibrationMetricType::KlingGupta2012 => Self::kge(self.observed, self.simulated, KlingGuptaMethod::Y2012),
         };
         Ok(v)
     }
@@ -124,7 +144,7 @@ impl CalibrationMetric {
 
 #[cfg(test)]
 mod tests {
-    use crate::metric::CalibrationMetric;
+    use crate::metric::{CalibrationMetric, CalibrationMetricType};
     use float_cmp::{assert_approx_eq, F64Margin};
 
     const A: [f64; 6] = [1250.0, 0.3, 500.0, 5.2, 2.0, 10.0];
@@ -136,21 +156,23 @@ mod tests {
 
     #[test]
     fn test_ideal_values() {
+        let metric = CalibrationMetric::new(&B, &B).unwrap();
         assert_eq!(
-            CalibrationMetric::NashSutcliffe.value(&A, &A),
-            Ok(CalibrationMetric::NashSutcliffe.ideal_value())
+            metric.value(CalibrationMetricType::NashSutcliffe),
+            Ok(CalibrationMetric::ideal_value(CalibrationMetricType::NashSutcliffe))
         );
         assert_eq!(
-            CalibrationMetric::LogNashSutcliffe.value(&A, &A),
-            Ok(CalibrationMetric::LogNashSutcliffe.ideal_value())
+            metric.value(CalibrationMetricType::LogNashSutcliffe),
+            Ok(CalibrationMetric::ideal_value(CalibrationMetricType::LogNashSutcliffe))
         );
     }
 
     #[test]
     fn test_nse_metric() {
+        let metric = CalibrationMetric::new(&A, &B).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::NashSutcliffe.value(&A, &B).unwrap(),
+            metric.value(CalibrationMetricType::NashSutcliffe).unwrap(),
             -0.006497117928065954,
             MARGINS
         );
@@ -158,9 +180,10 @@ mod tests {
 
     #[test]
     fn test_nse_metric_with_nan_1() {
+        let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::NashSutcliffe.value(&A_NAN, &B).unwrap(),
+            metric.value(CalibrationMetricType::NashSutcliffe).unwrap(),
             0.540371734977912,
             MARGINS
         );
@@ -168,9 +191,10 @@ mod tests {
 
     #[test]
     fn test_nse_metric_with_nan_2() {
+        let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::NashSutcliffe.value(&A_NAN, &B_NAN).unwrap(),
+            metric.value(CalibrationMetricType::NashSutcliffe).unwrap(),
             0.5404989162123923,
             MARGINS
         );
@@ -178,9 +202,10 @@ mod tests {
 
     #[test]
     fn test_log_nse_metric() {
+        let metric = CalibrationMetric::new(&A, &B).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::LogNashSutcliffe.value(&A, &B).unwrap(),
+            metric.value(CalibrationMetricType::LogNashSutcliffe).unwrap(),
             0.6930355551239313,
             MARGINS
         );
@@ -188,9 +213,10 @@ mod tests {
 
     #[test]
     fn test_log_nse_metric_with_nan_1() {
+        let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::LogNashSutcliffe.value(&A_NAN, &B).unwrap(),
+            metric.value(CalibrationMetricType::LogNashSutcliffe).unwrap(),
             0.612135455999324,
             MARGINS
         );
@@ -198,9 +224,10 @@ mod tests {
 
     #[test]
     fn test_log_nse_metric_with_nan_2() {
+        let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::LogNashSutcliffe.value(&A_NAN, &B_NAN).unwrap(),
+            metric.value(CalibrationMetricType::LogNashSutcliffe).unwrap(),
             0.6176288105498396,
             MARGINS
         );
@@ -208,9 +235,10 @@ mod tests {
 
     #[test]
     fn test_log_kg_2009_metric() {
+        let metric = CalibrationMetric::new(&A, &B).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::KlingGupta2009.value(&A, &B).unwrap(),
+            metric.value(CalibrationMetricType::KlingGupta2009).unwrap(),
             -0.16047005836641337,
             MARGINS
         );
@@ -218,9 +246,10 @@ mod tests {
 
     #[test]
     fn test_log_kg_2009_metric_with_nan_1() {
+        let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::KlingGupta2009.value(&A_NAN, &B).unwrap(),
+            metric.value(CalibrationMetricType::KlingGupta2009).unwrap(),
             0.13079945561027917,
             MARGINS
         );
@@ -228,9 +257,10 @@ mod tests {
 
     #[test]
     fn test_log_kg_2009_metric_with_nan_2() {
+        let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::KlingGupta2009.value(&A_NAN, &B_NAN).unwrap(),
+            metric.value(CalibrationMetricType::KlingGupta2009).unwrap(),
             0.1481643733978315,
             MARGINS
         );
@@ -238,9 +268,10 @@ mod tests {
 
     #[test]
     fn test_log_kg_2012_metric() {
+        let metric = CalibrationMetric::new(&A, &B).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::KlingGupta2012.value(&A, &B).unwrap(),
+            metric.value(CalibrationMetricType::KlingGupta2012).unwrap(),
             0.15721037908744573,
             MARGINS
         );
@@ -248,9 +279,10 @@ mod tests {
 
     #[test]
     fn test_log_kg_2012_metric_with_nan_1() {
+        let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::KlingGupta2012.value(&A_NAN, &B).unwrap(),
+            metric.value(CalibrationMetricType::KlingGupta2012).unwrap(),
             0.3625714406316686,
             MARGINS
         );
@@ -258,9 +290,10 @@ mod tests {
 
     #[test]
     fn test_log_kg_2012_metric_with_nan_2() {
+        let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
         assert_approx_eq!(
             f64,
-            CalibrationMetric::KlingGupta2012.value(&A_NAN, &B_NAN).unwrap(),
+            metric.value(CalibrationMetricType::KlingGupta2012).unwrap(),
             0.3950431057298418,
             MARGINS
         );
