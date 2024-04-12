@@ -1,9 +1,10 @@
-use crate::utils::NaNVec;
+use crate::utils::{calculate_fdc, NaNVec};
 
 /// The method to use to calculate the Kling-Gupta coefficient
 pub enum KlingGuptaMethod {
     Y2009,
     Y2012,
+    NonParametric,
 }
 
 #[derive(Clone, Copy)]
@@ -17,8 +18,20 @@ pub enum CalibrationMetricType {
     /// importance to low flow periods. An efficiency of 1 gives a perfect match of simulated to
     /// observed data.
     LogNashSutcliffe,
+    /// The 2009 Kling-Gupta efficiency metric. An efficiency of 1 gives a perfect match
+    /// of simulated to observed data. To calculate the alpha component the standard deviation is
+    /// used.
     KlingGupta2009,
+    /// The 2012 Kling-Gupta efficiency metric. An efficiency of 1 gives a perfect match
+    /// of simulated to observed data. To calculate the alpha component the ratio of the standard
+    /// deviation and the mean is used.
     KlingGupta2012,
+    /// The non-parametric Kling-Gupta efficiency metric. An efficiency of 1 gives a perfect match
+    /// of simulated to observed data. This differs from [`Self::KlingGupta2009`] and
+    /// [`Self::KlingGupta2012`] because the alpha component is calculated using the flow percentile
+    /// from the flow duration curve instead of using the standard deviation.
+    /// See https://www.tandfonline.com/doi/full/10.1080/02626667.2018.1552002
+    NonParamettricKlingGupta,
 }
 
 pub struct CalibrationMetric<'a> {
@@ -50,8 +63,9 @@ impl<'a> CalibrationMetric<'a> {
         match metric_type {
             CalibrationMetricType::NashSutcliffe => "Nash-Sutcliffe",
             CalibrationMetricType::LogNashSutcliffe => "Nash-Sutcliffe with log flows",
-            CalibrationMetricType::KlingGupta2009 => "Ling-Gupta (2009)",
-            CalibrationMetricType::KlingGupta2012 => "Ling-Gupta (2012)",
+            CalibrationMetricType::KlingGupta2009 => "Kling-Gupta (2009)",
+            CalibrationMetricType::KlingGupta2012 => "Kling-Gupta (2012)",
+            CalibrationMetricType::NonParamettricKlingGupta => "Non-parametric Kling-Gupta",
         }
     }
 
@@ -68,6 +82,7 @@ impl<'a> CalibrationMetric<'a> {
             CalibrationMetricType::LogNashSutcliffe => 1.0,
             CalibrationMetricType::KlingGupta2009 => 1.0,
             CalibrationMetricType::KlingGupta2012 => 1.0,
+            CalibrationMetricType::NonParamettricKlingGupta => 1.0,
         }
     }
 
@@ -87,6 +102,9 @@ impl<'a> CalibrationMetric<'a> {
             ),
             CalibrationMetricType::KlingGupta2009 => Self::kge(self.observed, self.simulated, KlingGuptaMethod::Y2009),
             CalibrationMetricType::KlingGupta2012 => Self::kge(self.observed, self.simulated, KlingGuptaMethod::Y2012),
+            CalibrationMetricType::NonParamettricKlingGupta => {
+                Self::kge(self.observed, self.simulated, KlingGuptaMethod::NonParametric)
+            }
         };
         Ok(v)
     }
@@ -139,6 +157,22 @@ impl<'a> CalibrationMetric<'a> {
         let alpha = match method {
             KlingGuptaMethod::Y2009 => sim.std() / obs.std(),
             KlingGuptaMethod::Y2012 => (sim.std() / sim_mean) / (obs.std() / obs_mean),
+            KlingGuptaMethod::NonParametric => {
+                let scaled_obs: Vec<f64> = observed
+                    .iter()
+                    .map(|x| x / (obs_mean * observed.len() as f64))
+                    .collect();
+                let (_, obs_fdc) = calculate_fdc(scaled_obs.as_slice());
+
+                let scaled_sim: Vec<f64> = simulated
+                    .iter()
+                    .map(|x| x / (sim_mean * simulated.len() as f64))
+                    .collect();
+                let (_, sim_fdc) = calculate_fdc(scaled_sim.as_slice());
+
+                let deltas: f64 = sim_fdc.iter().zip(obs_fdc).map(|(x1, x2)| (x1 - x2).abs()).sum();
+                1.0 - 0.5 * deltas
+            }
         };
 
         1.0 - ((r - 1.0).powi(2) + (alpha - 1.0).powi(2) + (beta - 1.0).powi(2)).powf(0.5)
@@ -237,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn test_log_kg_2009_metric() {
+    fn test_kg_2009_metric() {
         let metric = CalibrationMetric::new(&A, &B).unwrap();
         assert_approx_eq!(
             f64,
@@ -248,7 +282,7 @@ mod tests {
     }
 
     #[test]
-    fn test_log_kg_2009_metric_with_nan_1() {
+    fn test_kg_2009_metric_with_nan_1() {
         let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
         assert_approx_eq!(
             f64,
@@ -259,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_log_kg_2009_metric_with_nan_2() {
+    fn test_kg_2009_metric_with_nan_2() {
         let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
         assert_approx_eq!(
             f64,
@@ -270,7 +304,7 @@ mod tests {
     }
 
     #[test]
-    fn test_log_kg_2012_metric() {
+    fn test_kg_2012_metric() {
         let metric = CalibrationMetric::new(&A, &B).unwrap();
         assert_approx_eq!(
             f64,
@@ -281,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn test_log_kg_2012_metric_with_nan_1() {
+    fn test_kg_2012_metric_with_nan_1() {
         let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
         assert_approx_eq!(
             f64,
@@ -292,12 +326,45 @@ mod tests {
     }
 
     #[test]
-    fn test_log_kg_2012_metric_with_nan_2() {
+    fn test_kg_2012_metric_with_nan_2() {
         let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
         assert_approx_eq!(
             f64,
             metric.value(CalibrationMetricType::KlingGupta2012).unwrap(),
             0.3950431057298418,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_np_kg_metric() {
+        let metric = CalibrationMetric::new(&A, &B).unwrap();
+        assert_approx_eq!(
+            f64,
+            metric.value(CalibrationMetricType::NonParamettricKlingGupta).unwrap(),
+            0.16491320894422312,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_np_kg_metric_with_nan_1() {
+        let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
+        assert_approx_eq!(
+            f64,
+            metric.value(CalibrationMetricType::NonParamettricKlingGupta).unwrap(),
+            0.3714685584392162,
+            MARGINS
+        );
+    }
+
+    #[test]
+    fn test_np_kg_metric_with_nan_2() {
+        let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
+        assert_approx_eq!(
+            f64,
+            metric.value(CalibrationMetricType::NonParamettricKlingGupta).unwrap(),
+            0.40091725404120415,
             MARGINS
         );
     }
