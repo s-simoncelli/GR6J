@@ -1,5 +1,5 @@
 use crate::error::ModelPeriodError;
-use crate::parameter::Parameter;
+use crate::parameter::{X1, X2, X3, X4, X5, X6};
 use chrono::NaiveDate;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -57,26 +57,26 @@ pub enum CatchmentType {
 }
 
 /// The data for the catchment or hydrological unit.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct CatchmentData {
     /// The catchment os sub-catchment area (km2).
     pub area: f64,
     /// Maximum capacity of the production store (mm/day)
-    pub x1: Parameter,
+    pub x1: Box<X1>,
     /// Inter-catchment (or groundwater) exchange coefficient (mm/day). X2 can be positive
     /// or negative to simulate imports or exports of water with deep aquifers or
     /// surrounding catchments.
-    pub x2: Parameter,
+    pub x2: Box<X2>,
     /// One-day-ahead maximum capacity of the routing store (mm/day)
-    pub x3: Parameter,
+    pub x3: Box<X3>,
     /// Time base of unit hydrograph `UH1` (days)
-    pub x4: Parameter,
+    pub x4: Box<X4>,
     /// Inter-catchment exchange threshold. This is a dimensionless threshold parameter that
     /// allows a change in the direction of the groundwater exchange depending on the capacity
     /// of the routing store level `R`.
-    pub x5: Parameter,
+    pub x5: Box<X5>,
     /// Time constant of exponential store (mm)
-    pub x6: Parameter,
+    pub x6: Box<X6>,
     /// The store levels
     pub store_levels: Option<StoreLevels>,
 }

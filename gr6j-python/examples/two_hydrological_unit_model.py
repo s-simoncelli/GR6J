@@ -11,8 +11,8 @@ data = pd.read_csv(
 )
 
 # Configure the model
-start = date(1994, 1, 1)
-end = date(1998, 12, 31)
+start = date(1990, 1, 1)
+end = date(1994, 12, 31)
 
 inputs = GR6JModelInputs(
     time=data.index.tolist(),

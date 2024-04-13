@@ -1,17 +1,19 @@
+use std::fmt::Debug;
+use std::fs::create_dir;
+use std::path::{Path, PathBuf};
+
+use chrono::{Local, NaiveDate, TimeDelta};
+use csv::Writer;
+use log::{debug, info, warn};
+
 use crate::chart::{generate_fdc_chart, generate_summary_chart, FDCData};
 use crate::error::{LoadModelError, RunModelError};
 use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
 use crate::metric::{CalibrationMetric, CalibrationMetricType};
 use crate::outputs::{GR6JOutputs, ModelStepData, ModelStepDataVector};
-use crate::parameter::Parameter;
+use crate::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
 use crate::unit_hydrograph::{UnitHydrograph, UnitHydrographInputs, UnitHydrographType};
-use crate::utils::calculate_fdc;
-use chrono::{Local, NaiveDate, TimeDelta};
-use csv::Writer;
-use log::{debug, info, warn};
-use std::fmt::Debug;
-use std::fs::create_dir;
-use std::path::{Path, PathBuf};
+use crate::utils::{calculate_fdc, vector_nan_indices};
 
 /// Internal state variables
 #[derive(Debug)]
@@ -32,17 +34,17 @@ struct ModelData {
     /// The catchment os sub-catchment area (km2).
     area: f64,
     /// Parameter X1
-    x1: Parameter,
+    x1: X1,
     /// Parameter X2
-    x2: Parameter,
+    x2: X2,
     /// Parameter X3
-    x3: Parameter,
+    x3: X3,
     /// Parameter X4
-    x4: Parameter,
+    x4: X4,
     /// Parameter X5
-    x5: Parameter,
+    x5: X5,
     /// Parameter X6
-    x6: Parameter,
+    x6: X6,
     /// The current internal state of the model
     state: InternalState,
 }
@@ -69,32 +71,6 @@ pub struct GR6JModel {
 }
 
 impl GR6JModel {
-    /// Check the value of a parameter is within the allowed bound.
-    ///
-    /// # Arguments
-    ///
-    /// * `value`: The parameter value.
-    /// * `param_type`: The parameter type.
-    fn check_parameter_range(parameter: Parameter) -> Result<(), LoadModelError> {
-        // check min
-        if parameter.value() < parameter.min_threshold() {
-            return Err(LoadModelError::LoadModel(format!(
-                "The {} must be larger than its minimum threshold ({})",
-                parameter,
-                parameter.min_threshold(),
-            )));
-        }
-        // check max
-        if parameter.value() > parameter.max_threshold() {
-            return Err(LoadModelError::LoadModel(format!(
-                "The {} must be smaller than its maximum threshold ({})",
-                parameter,
-                parameter.max_threshold(),
-            )));
-        }
-        Ok(())
-    }
-
     /// Create a new instance(s) of the GR6J model(s). More instances are created if more than
     /// one hydrological unit is provided.
     ///
@@ -244,28 +220,23 @@ impl GR6JModel {
         };
 
         // check the input data
-        if precipitation.iter().any(|&i| i.is_nan()) {
-            return Err(LoadModelError::NanData("precipitation".to_string()));
+        let i = vector_nan_indices(precipitation.as_slice());
+        if !i.is_empty() {
+            return Err(LoadModelError::NanData("precipitation".to_string(), i));
         }
-        if evapotranspiration.iter().any(|&i| i.is_nan()) {
-            return Err(LoadModelError::NanData("evapo-transpiration".to_string()));
+        let i = vector_nan_indices(evapotranspiration.as_slice());
+        if !i.is_empty() {
+            return Err(LoadModelError::NanData("evapo-transpiration".to_string(), i));
         }
         if let Some(ref o) = observed {
-            if o.iter().any(|&i| i.is_nan()) {
-                return Err(LoadModelError::NanData("observed run-off".to_string()));
+            let i = vector_nan_indices(o.as_slice());
+            if !i.is_empty() {
+                return Err(LoadModelError::NanData("observed run-off".to_string(), i));
             }
         }
 
         let mut models: Vec<ModelData> = vec![];
         for catchment_data in catchments_data.iter() {
-            // check parameters
-            Self::check_parameter_range(catchment_data.x1)?;
-            Self::check_parameter_range(catchment_data.x2)?;
-            Self::check_parameter_range(catchment_data.x3)?;
-            Self::check_parameter_range(catchment_data.x4)?;
-            Self::check_parameter_range(catchment_data.x5)?;
-            Self::check_parameter_range(catchment_data.x6)?;
-
             // initialise the reservoir levels
             let mut int_store_levels = catchment_data.store_levels.unwrap_or_default();
 
@@ -297,12 +268,12 @@ impl GR6JModel {
 
             models.push(ModelData {
                 area: catchment_data.area,
-                x1: catchment_data.x1,
-                x2: catchment_data.x2,
-                x3: catchment_data.x3,
-                x4: catchment_data.x4,
-                x5: catchment_data.x5,
-                x6: catchment_data.x6,
+                x1: *catchment_data.x1,
+                x2: *catchment_data.x2,
+                x3: *catchment_data.x3,
+                x4: *catchment_data.x4,
+                x5: *catchment_data.x5,
+                x6: *catchment_data.x6,
                 state: internal_state,
             })
         }
@@ -690,38 +661,38 @@ impl GR6JModel {
         wtr.write_record([
             "X1",
             data.x1.value().to_string().as_str(),
-            data.x1.unit(),
-            data.x1.description(),
+            X1::unit(),
+            X1::description(),
         ])?;
         wtr.write_record([
             "X2",
             data.x2.value().to_string().as_str(),
-            data.x2.unit(),
-            data.x2.description(),
+            X2::unit(),
+            X2::description(),
         ])?;
         wtr.write_record([
             "X3",
             data.x3.value().to_string().as_str(),
-            data.x3.unit(),
-            data.x3.description(),
+            X3::unit(),
+            X3::description(),
         ])?;
         wtr.write_record([
             "X4",
             data.x4.value().to_string().as_str(),
-            data.x4.unit(),
-            data.x4.description(),
+            X4::unit(),
+            X4::description(),
         ])?;
         wtr.write_record([
             "X5",
             data.x5.value().to_string().as_str(),
-            data.x5.unit(),
-            data.x5.description(),
+            X5::unit(),
+            X5::description(),
         ])?;
         wtr.write_record([
             "X6",
             data.x6.value().to_string().as_str(),
-            data.x6.unit(),
-            data.x6.description(),
+            X6::unit(),
+            X6::description(),
         ])?;
         wtr.flush()?;
         Ok(())
@@ -760,15 +731,31 @@ impl GR6JModel {
 
 #[cfg(test)]
 mod tests {
-    use crate::inputs::{CatchmentData, RunOffUnit, StoreLevels};
-    use crate::model::{CatchmentType, GR6JModel, GR6JModelInputs, ModelPeriod, Parameter};
-    use crate::outputs::{ModelStepData, ModelStepDataVector};
-    use crate::utils::assert_approx_array_eq;
     use chrono::{Datelike, NaiveDate, TimeDelta};
     use std::env;
+    use std::error::Error;
     use std::fs::File;
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
+
+    use crate::inputs::{CatchmentData, RunOffUnit, StoreLevels};
+    use crate::model::{CatchmentType, GR6JModel, GR6JModelInputs, ModelPeriod, Parameter};
+    use crate::outputs::{ModelStepData, ModelStepDataVector};
+    use crate::parameter::{X1, X2, X3, X4, X5, X6};
+    use crate::utils::assert_approx_array_eq;
+
+    fn default_catchment_data() -> CatchmentData {
+        CatchmentData {
+            area: 1.0,
+            x1: X1::new(0.01).unwrap(),
+            x2: X2::new(0.0).unwrap(),
+            x3: X3::new(0.4).unwrap(),
+            x4: X4::new(0.6).unwrap(),
+            x5: X5::new(0.0).unwrap(),
+            x6: X6::new(0.4).unwrap(),
+            store_levels: None,
+        }
+    }
 
     /// Parse the result file for a GR6J run from R
     fn parse_r_file(file: &Path) -> ModelStepDataVector {
@@ -809,6 +796,20 @@ mod tests {
         Path::new(&env::current_dir().unwrap()).join("src").join("test_data")
     }
 
+    struct CompareInputArgs<'a> {
+        r_csv_file: &'a str,
+        start_year: i32,
+        stop_year: i32,
+        start: Option<NaiveDate>,
+        end: Option<NaiveDate>,
+        x1: Result<Box<X1>, Box<dyn Error>>,
+        x2: Result<Box<X2>, Box<dyn Error>>,
+        x3: Result<Box<X3>, Box<dyn Error>>,
+        x4: Result<Box<X4>, Box<dyn Error>>,
+        x5: Result<Box<X5>, Box<dyn Error>>,
+        x6: Result<Box<X6>, Box<dyn Error>>,
+    }
+
     /// Run the model and compare the results against data generate for the airGR R package.
     ///
     /// # Arguments
@@ -821,15 +822,8 @@ mod tests {
     /// * `parameters`: The list of model parameters.
     ///
     /// returns: ()
-    fn compare_against_r_data(
-        r_csv_file: &str,
-        start_year: i32,
-        stop_year: i32,
-        start: Option<NaiveDate>,
-        end: Option<NaiveDate>,
-        parameters: [Parameter; 6],
-    ) {
-        let expected_data = parse_r_file(test_path().join(r_csv_file).as_ref());
+    fn compare_against_r_data<'a>(args: CompareInputArgs) {
+        let expected_data = parse_r_file(test_path().join(args.r_csv_file).as_ref());
         let file = File::open(test_path().join("airGR_L0123001_dataset.csv")).expect("Failed to read CSV file");
         let mut rdr = csv::Reader::from_reader(file);
 
@@ -840,10 +834,10 @@ mod tests {
             let record = result.unwrap();
             let date = NaiveDate::parse_from_str(record.get(0).unwrap(), "%d/%m/%Y").unwrap();
 
-            if date.year() < start_year {
+            if date.year() < args.start_year {
                 continue;
             }
-            if date.year() > stop_year {
+            if date.year() > args.stop_year {
                 break;
             }
 
@@ -852,25 +846,26 @@ mod tests {
             evapotranspiration.push(record.get(2).unwrap().parse::<f64>().unwrap());
         }
 
-        let start = match start {
+        let start = match args.start {
             None => *time.first().unwrap(),
             Some(s) => s,
         };
-        let end = match end {
+        let end = match args.end {
             None => *time.last().unwrap(),
             Some(e) => e,
         };
 
         let catchment_data = CatchmentData {
             area: 1.0,
-            x1: parameters[0],
-            x2: parameters[1],
-            x3: parameters[2],
-            x4: parameters[3],
-            x5: parameters[4],
-            x6: parameters[5],
+            x1: args.x1.unwrap(),
+            x2: args.x2.unwrap(),
+            x3: args.x3.unwrap(),
+            x4: args.x4.unwrap(),
+            x5: args.x5.unwrap(),
+            x6: args.x6.unwrap(),
             store_levels: None,
         };
+        let area = catchment_data.area;
         let inputs = GR6JModelInputs {
             time,
             precipitation,
@@ -899,10 +894,7 @@ mod tests {
             results.catchment_outputs[0].exponential_store().as_ref(),
             &expected_data.exponential_store(),
         );
-        assert_approx_array_eq(
-            results.run_off.as_ref(),
-            &expected_data.run_off(Some(catchment_data.area)),
-        );
+        assert_approx_array_eq(results.run_off.as_ref(), &expected_data.run_off(Some(area)));
     }
 
     fn build_t_vector() -> Vec<NaiveDate> {
@@ -916,37 +908,13 @@ mod tests {
 
     #[test]
     fn test_too_small_x1() {
-        let t = build_t_vector();
-        let catchment_data = CatchmentData {
-            area: 1.0,
-            x1: Parameter::X1(0.0),
-            x2: Parameter::X2(0.0),
-            x3: Parameter::X3(0.4),
-            x4: Parameter::X4(0.6),
-            x5: Parameter::X5(0.0),
-            x6: Parameter::X6(0.4),
-            store_levels: None,
-        };
-        let inputs = GR6JModelInputs {
-            time: t.clone(),
-            precipitation: vec![0.0; t.len()],
-            evapotranspiration: vec![0.0; t.len()],
-            catchment: CatchmentType::OneCatchment(catchment_data),
-            run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
-            warmup_period: None,
-            destination: None,
-            observed_runoff: None,
-            run_off_unit: RunOffUnit::NoConversion,
-        };
-
-        let x1 = catchment_data.x1;
-        let model = GR6JModel::new(inputs);
+        let x1 = X1::new(0.0);
         assert_eq!(
-            model.unwrap_err().to_string(),
+            x1.unwrap_err().to_string(),
             format!(
                 "The {} must be larger than its minimum threshold ({})",
-                x1,
-                x1.min_threshold()
+                X1::description(),
+                X1::min()
             )
         )
     }
@@ -954,21 +922,11 @@ mod tests {
     #[test]
     fn test_invalid_precipitation_length() {
         let t = build_t_vector();
-        let catchment_data = CatchmentData {
-            area: 1.0,
-            x1: Parameter::X1(0.4),
-            x2: Parameter::X2(0.0),
-            x3: Parameter::X3(0.4),
-            x4: Parameter::X4(0.6),
-            x5: Parameter::X5(0.0),
-            x6: Parameter::X6(0.4),
-            store_levels: None,
-        };
         let inputs = GR6JModelInputs {
             time: t.clone(),
             precipitation: vec![0.0; t.len() - 10],
             evapotranspiration: vec![0.0; t.len()],
-            catchment: CatchmentType::OneCatchment(catchment_data),
+            catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -986,21 +944,11 @@ mod tests {
     #[test]
     fn test_invalid_evapotranspiration_length() {
         let t = build_t_vector();
-        let catchment_data = CatchmentData {
-            area: 1.0,
-            x1: Parameter::X1(0.4),
-            x2: Parameter::X2(0.0),
-            x3: Parameter::X3(0.4),
-            x4: Parameter::X4(0.6),
-            x5: Parameter::X5(0.0),
-            x6: Parameter::X6(0.4),
-            store_levels: None,
-        };
         let inputs = GR6JModelInputs {
             time: t.clone(),
             precipitation: vec![0.0; t.len()],
             evapotranspiration: vec![0.0; t.len() - 10],
-            catchment: CatchmentType::OneCatchment(catchment_data),
+            catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -1018,21 +966,11 @@ mod tests {
     fn test_non_continuous_dates() {
         let mut t = build_t_vector();
         t[365] += TimeDelta::try_days(3).unwrap();
-        let catchment_data = CatchmentData {
-            area: 1.0,
-            x1: Parameter::X1(0.4),
-            x2: Parameter::X2(0.0),
-            x3: Parameter::X3(0.4),
-            x4: Parameter::X4(0.6),
-            x5: Parameter::X5(0.0),
-            x6: Parameter::X6(0.4),
-            store_levels: None,
-        };
         let inputs = GR6JModelInputs {
             time: t.clone(),
             precipitation: vec![0.0; t.len()],
             evapotranspiration: vec![0.0; t.len()],
-            catchment: CatchmentType::OneCatchment(catchment_data),
+            catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -1049,21 +987,11 @@ mod tests {
     #[test]
     fn test_small_start_date() {
         let t = build_t_vector();
-        let catchment_data = CatchmentData {
-            area: 1.0,
-            x1: Parameter::X1(0.4),
-            x2: Parameter::X2(0.0),
-            x3: Parameter::X3(0.4),
-            x4: Parameter::X4(0.6),
-            x5: Parameter::X5(0.0),
-            x6: Parameter::X6(0.4),
-            store_levels: None,
-        };
         let inputs = GR6JModelInputs {
             time: t.clone(),
             precipitation: vec![0.0; t.len()],
             evapotranspiration: vec![0.0; t.len()],
-            catchment: CatchmentType::OneCatchment(catchment_data),
+            catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(NaiveDate::from_ymd_opt(1999, 1, 1).unwrap(), t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -1087,21 +1015,11 @@ mod tests {
 
         let mut p = vec![0.0; t.len()];
         p[0] = f64::NAN;
-        let catchment_data = CatchmentData {
-            area: 1.0,
-            x1: Parameter::X1(0.4),
-            x2: Parameter::X2(0.0),
-            x3: Parameter::X3(0.4),
-            x4: Parameter::X4(0.6),
-            x5: Parameter::X5(0.0),
-            x6: Parameter::X6(0.4),
-            store_levels: None,
-        };
         let inputs = GR6JModelInputs {
             time: t.clone(),
             precipitation: p,
             evapotranspiration: vec![0.0; t.len()],
-            catchment: CatchmentType::OneCatchment(catchment_data),
+            catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -1118,83 +1036,75 @@ mod tests {
     #[test]
     /// Test simulation with L0123001 dataset from 1994-01-01 to 1998-12-31 w/o warmup period.
     fn test_gr6j_l0123001_no_warm_up() {
-        compare_against_r_data(
-            "airGR_results_L0123001_no_warmup.csv",
-            1984,
-            1998,
-            Some(NaiveDate::from_ymd_opt(1984, 1, 1).unwrap()),
-            Some(NaiveDate::from_ymd_opt(1994, 12, 31).unwrap()),
-            [
-                Parameter::X1(1250.0),
-                Parameter::X2(0.3),
-                Parameter::X3(500.0),
-                Parameter::X4(5.2),
-                Parameter::X5(2.0),
-                Parameter::X6(10.0),
-            ],
-        )
+        compare_against_r_data(CompareInputArgs {
+            r_csv_file: "airGR_results_L0123001_no_warmup.csv",
+            start_year: 1984,
+            stop_year: 1998,
+            start: Some(NaiveDate::from_ymd_opt(1984, 1, 1).unwrap()),
+            end: Some(NaiveDate::from_ymd_opt(1994, 12, 31).unwrap()),
+            x1: X1::new(1250.0),
+            x2: X2::new(0.3),
+            x3: X3::new(500.0),
+            x4: X4::new(5.2),
+            x5: X5::new(2.0),
+            x6: X6::new(10.0),
+        })
     }
 
     #[test]
     /// Test simulation with L0123001 dataset from 1994-01-01 to 1998-12-31 w warmup period.
     fn test_gr6j_l0123001_sc1() {
-        compare_against_r_data(
-            "airGR_results_L0123001_sc1.csv",
-            1990,
-            1998,
-            Some(NaiveDate::from_ymd_opt(1994, 1, 1).unwrap()),
-            Some(NaiveDate::from_ymd_opt(1998, 12, 31).unwrap()),
-            [
-                Parameter::X1(1250.0),
-                Parameter::X2(0.3),
-                Parameter::X3(500.0),
-                Parameter::X4(5.2),
-                Parameter::X5(2.0),
-                Parameter::X6(10.0),
-            ],
-        );
+        compare_against_r_data(CompareInputArgs {
+            r_csv_file: "airGR_results_L0123001_sc1.csv",
+            start_year: 1990,
+            stop_year: 1998,
+            start: Some(NaiveDate::from_ymd_opt(1994, 1, 1).unwrap()),
+            end: Some(NaiveDate::from_ymd_opt(1998, 12, 31).unwrap()),
+            x1: X1::new(1250.0),
+            x2: X2::new(0.3),
+            x3: X3::new(500.0),
+            x4: X4::new(5.2),
+            x5: X5::new(2.0),
+            x6: X6::new(10.0),
+        });
     }
 
     #[test]
     /// Test simulation with L0123001 dataset from 1994-01-01 to 1998-12-31 w warmup period and
     /// different parameters.
     fn test_gr6j_l0123001_sc2() {
-        compare_against_r_data(
-            "airGR_results_L0123001_sc2.csv",
-            1990,
-            1998,
-            Some(NaiveDate::from_ymd_opt(1994, 1, 1).unwrap()),
-            Some(NaiveDate::from_ymd_opt(1998, 12, 31).unwrap()),
-            [
-                Parameter::X1(1000.0),
-                Parameter::X2(0.0),
-                Parameter::X3(200.0),
-                Parameter::X4(1.0),
-                Parameter::X5(0.0),
-                Parameter::X6(20.0),
-            ],
-        );
+        compare_against_r_data(CompareInputArgs {
+            r_csv_file: "airGR_results_L0123001_sc2.csv",
+            start_year: 1990,
+            stop_year: 1998,
+            start: Some(NaiveDate::from_ymd_opt(1994, 1, 1).unwrap()),
+            end: Some(NaiveDate::from_ymd_opt(1998, 12, 31).unwrap()),
+            x1: X1::new(1000.0),
+            x2: X2::new(0.0),
+            x3: X3::new(200.0),
+            x4: X4::new(1.0),
+            x5: X5::new(0.0),
+            x6: X6::new(20.0),
+        });
     }
 
     #[test]
     /// Test simulation with L0123001 dataset from 1994-01-01 to 1998-12-31 w warmup period and
     /// different parameters.
     fn test_gr6j_l0123001_sc3() {
-        compare_against_r_data(
-            "airGR_results_L0123001_sc3.csv",
-            1990,
-            1998,
-            Some(NaiveDate::from_ymd_opt(1994, 1, 1).unwrap()),
-            Some(NaiveDate::from_ymd_opt(1998, 12, 31).unwrap()),
-            [
-                Parameter::X1(31.0),
-                Parameter::X2(3.47),
-                Parameter::X3(32.0),
-                Parameter::X4(2.1),
-                Parameter::X5(0.55),
-                Parameter::X6(5.3),
-            ],
-        );
+        compare_against_r_data(CompareInputArgs {
+            r_csv_file: "airGR_results_L0123001_sc3.csv",
+            start_year: 1990,
+            stop_year: 1998,
+            start: Some(NaiveDate::from_ymd_opt(1994, 1, 1).unwrap()),
+            end: Some(NaiveDate::from_ymd_opt(1998, 12, 31).unwrap()),
+            x1: X1::new(31.0),
+            x2: X2::new(3.47),
+            x3: X3::new(32.0),
+            x4: X4::new(2.1),
+            x5: X5::new(0.55),
+            x6: X6::new(5.3),
+        });
     }
 
     #[test]
@@ -1216,22 +1126,22 @@ mod tests {
 
         let hu1 = CatchmentData {
             area: 10.0,
-            x1: Parameter::X1(1000.0),
-            x2: Parameter::X2(0.0),
-            x3: Parameter::X3(200.0),
-            x4: Parameter::X4(1.0),
-            x5: Parameter::X5(0.0),
-            x6: Parameter::X6(20.0),
+            x1: X1::new(1000.0).unwrap(),
+            x2: X2::new(0.0).unwrap(),
+            x3: X3::new(200.).unwrap(),
+            x4: X4::new(1.0).unwrap(),
+            x5: X5::new(0.0).unwrap(),
+            x6: X6::new(20.0).unwrap(),
             store_levels: None,
         };
         let hu2 = CatchmentData {
             area: 5.0,
-            x1: Parameter::X1(2000.0),
-            x2: Parameter::X2(2.0),
-            x3: Parameter::X3(500.0),
-            x4: Parameter::X4(3.2),
-            x5: Parameter::X5(0.0),
-            x6: Parameter::X6(15.0),
+            x1: X1::new(2000.0).unwrap(),
+            x2: X2::new(2.0).unwrap(),
+            x3: X3::new(500.0).unwrap(),
+            x4: X4::new(3.2).unwrap(),
+            x5: X5::new(0.0).unwrap(),
+            x6: X6::new(15.0).unwrap(),
             store_levels: None,
         };
         let start = *time.first().unwrap();

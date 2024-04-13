@@ -5,7 +5,7 @@ use ::gr6j::inputs::{
 };
 use ::gr6j::model::GR6JModel as RsGR6JModel;
 use ::gr6j::outputs::ModelStepData as RsModelStepData;
-use ::gr6j::parameter::Parameter;
+use ::gr6j::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
 use chrono::NaiveDate;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -56,7 +56,7 @@ impl StoreLevels {
 }
 
 #[pyclass(get_all)]
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct CatchmentData {
     area: f64,
     x1: f64,
@@ -68,18 +68,19 @@ struct CatchmentData {
     store_levels: Option<StoreLevels>,
 }
 
-impl From<CatchmentData> for RsCatchmentData {
-    fn from(s: CatchmentData) -> RsCatchmentData {
-        RsCatchmentData {
+impl TryFrom<CatchmentData> for RsCatchmentData {
+    type Error = String;
+    fn try_from(s: CatchmentData) -> Result<Self, Self::Error> {
+        Ok(RsCatchmentData {
             area: s.area,
-            x1: Parameter::X1(s.x1),
-            x2: Parameter::X2(s.x2),
-            x3: Parameter::X3(s.x3),
-            x4: Parameter::X4(s.x4),
-            x5: Parameter::X5(s.x5),
-            x6: Parameter::X6(s.x6),
+            x1: X1::new(s.x1)?,
+            x2: X2::new(s.x2)?,
+            x3: X3::new(s.x3)?,
+            x4: X4::new(s.x4)?,
+            x5: X5::new(s.x5)?,
+            x6: X6::new(s.x6)?,
             store_levels: s.store_levels.map(|l| l.into()),
-        }
+        })
     }
 }
 
@@ -96,8 +97,8 @@ impl CatchmentData {
         x5: f64,
         x6: f64,
         store_levels: Option<StoreLevels>,
-    ) -> CatchmentData {
-        CatchmentData {
+    ) -> PyResult<CatchmentData> {
+        let data = CatchmentData {
             area,
             x1,
             x2,
@@ -106,7 +107,11 @@ impl CatchmentData {
             x5,
             x6,
             store_levels,
-        }
+        };
+        // throw exceptions
+        RsCatchmentData::try_from(data).map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        Ok(data)
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -127,7 +132,7 @@ impl CatchmentData {
 }
 
 #[pyclass(get_all)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct ModelPeriod {
     start: NaiveDate,
     end: NaiveDate,
@@ -143,8 +148,13 @@ impl TryFrom<ModelPeriod> for RsModelPeriod {
 #[pymethods]
 impl ModelPeriod {
     #[new]
-    fn new(start: NaiveDate, end: NaiveDate) -> Self {
-        ModelPeriod { start, end }
+    fn new(start: NaiveDate, end: NaiveDate) -> PyResult<Self> {
+        let period = ModelPeriod { start, end };
+
+        // throw exceptions
+        RsModelPeriod::try_from(period).map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        Ok(period)
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -188,13 +198,16 @@ struct CatchmentType {
     more_catchments: Option<Vec<CatchmentData>>,
 }
 
-impl From<CatchmentType> for RsCatchmentType {
-    fn from(s: CatchmentType) -> RsCatchmentType {
+impl TryFrom<CatchmentType> for RsCatchmentType {
+    type Error = String;
+
+    fn try_from(s: CatchmentType) -> Result<Self, Self::Error> {
         if let Some(c) = s.more_catchments {
-            RsCatchmentType::SubCatchments(c.into_iter().map(Into::<RsCatchmentData>::into).collect())
+            let uh_data: Result<Vec<_>, _> = c.into_iter().map(|data| data.try_into()).collect();
+            Ok(RsCatchmentType::SubCatchments(uh_data?))
         } else {
             let data = s.one_catchment.expect("Missing CatchmentData");
-            RsCatchmentType::OneCatchment(Into::<RsCatchmentData>::into(data))
+            Ok(RsCatchmentType::OneCatchment(data.try_into()?))
         }
     }
 }
@@ -453,11 +466,15 @@ impl GR6JModel {
             ),
         };
 
+        let catchment = inputs
+            .rs_catchment
+            .try_into()
+            .map_err(|e: String| PyValueError::new_err(e))?;
         let inputs = RsGR6JModelInputs {
             time: inputs.time,
             precipitation: inputs.precipitation,
             evapotranspiration: inputs.evapotranspiration,
-            catchment: inputs.rs_catchment.into(),
+            catchment,
             run_period,
             warmup_period,
             destination: inputs.destination,
