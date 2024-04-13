@@ -110,8 +110,11 @@ pub(crate) fn generate_summary_chart(
     Ok(())
 }
 
+/// Data for a flow duration curve.
 pub struct FDCData {
+    /// The probability of flow exceedence.
     pub exceedence: Vec<f64>,
+    /// The run-off corresponding to the exceedence probability.
     pub run_off: Vec<f64>,
 }
 

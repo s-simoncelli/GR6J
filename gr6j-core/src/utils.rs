@@ -103,7 +103,7 @@ impl NaNVec<'_> {
     ///
     /// * `vec`: The vector to reduce.
     ///
-    /// returns: Vec<f64>
+    /// returns: `Vec<f64>`
     pub fn remove_nans(&self) -> Vec<f64> {
         self.0.iter().copied().filter(|x| !x.is_nan()).collect()
     }
@@ -189,7 +189,7 @@ impl NaNVec<'_> {
     ///
     /// * `y`: The second vector.
     ///
-    /// returns: Result<(Vec<f64>, Vec<f64>), &str>
+    /// returns: Result<(`Vec<f64>`, `Vec<f64>`), &str>
     pub fn remove_nans_from_pair<'a>(&self, y: &[f64]) -> Result<(Vec<f64>, Vec<f64>), &'a str> {
         if self.0.len() != y.len() {
             return Err("The vector must have the same length");

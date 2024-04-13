@@ -7,19 +7,19 @@ pub trait Parameter<'a>: fmt::Display {
     /// Check that a value is within the min and max parameter bounds.
     fn check(value: f64) -> Result<(), String> {
         // check min
-        if value < Self::min() {
+        if value < Self::min_value() {
             return Err(format!(
                 "The {} must be larger than its minimum threshold ({})",
                 Self::description(),
-                Self::min(),
+                Self::min_value(),
             ));
         }
         // check max
-        if value > Self::max() {
+        if value > Self::max_value() {
             return Err(format!(
                 "The {} must be smaller than its maximum threshold ({})",
                 Self::description(),
-                Self::max(),
+                Self::max_value(),
             ));
         }
 
@@ -30,10 +30,10 @@ pub trait Parameter<'a>: fmt::Display {
     fn value(&self) -> f64;
 
     /// Return the parameter minimum value.
-    fn min() -> f64;
+    fn min_value() -> f64;
 
     /// Return the parameter maximum value.
-    fn max() -> f64;
+    fn max_value() -> f64;
 
     /// Return the parameter unit of measurement.
     fn unit() -> &'a str;
@@ -56,11 +56,11 @@ impl<'a> Parameter<'a> for X1 {
         self.0
     }
 
-    fn min() -> f64 {
+    fn min_value() -> f64 {
         1e-2
     }
 
-    fn max() -> f64 {
+    fn max_value() -> f64 {
         2500.0
     }
 
@@ -95,11 +95,11 @@ impl<'a> Parameter<'a> for X2 {
         self.0
     }
 
-    fn min() -> f64 {
+    fn min_value() -> f64 {
         -5.0
     }
 
-    fn max() -> f64 {
+    fn max_value() -> f64 {
         5.0
     }
 
@@ -132,11 +132,11 @@ impl<'a> Parameter<'a> for X3 {
         self.0
     }
 
-    fn min() -> f64 {
+    fn min_value() -> f64 {
         1e-2
     }
 
-    fn max() -> f64 {
+    fn max_value() -> f64 {
         1000.0
     }
 
@@ -169,11 +169,11 @@ impl<'a> Parameter<'a> for X4 {
         self.0
     }
 
-    fn min() -> f64 {
+    fn min_value() -> f64 {
         0.5
     }
 
-    fn max() -> f64 {
+    fn max_value() -> f64 {
         10.0
     }
 
@@ -208,11 +208,11 @@ impl<'a> Parameter<'a> for X5 {
         self.0
     }
 
-    fn min() -> f64 {
+    fn min_value() -> f64 {
         -4.0
     }
 
-    fn max() -> f64 {
+    fn max_value() -> f64 {
         4.0
     }
 
@@ -245,11 +245,11 @@ impl<'a> Parameter<'a> for X6 {
         self.0
     }
 
-    fn min() -> f64 {
+    fn min_value() -> f64 {
         1e-2
     }
 
-    fn max() -> f64 {
+    fn max_value() -> f64 {
         20.0
     }
 
@@ -265,5 +265,244 @@ impl<'a> Parameter<'a> for X6 {
 impl fmt::Display for X6 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{} (X6={})", X6::description(), self.0)
+    }
+}
+
+/// For each model parameter, define the range of values to use during the calibration sub-sampling.
+pub trait ParameterRange {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String>;
+
+    /// Check that a value is within the min and max parameter bounds.
+    fn check(lower_bound: f64, upper_bound: f64, min: f64, max: f64, name: &str) -> Result<(), String> {
+        // check min
+        if lower_bound < min {
+            return Err(format!(
+                "The lower bound ({}) for '{}' must be larger than the parameter minimum threshold ({})",
+                lower_bound, name, min,
+            ));
+        }
+        // check max
+        if upper_bound > max {
+            return Err(format!(
+                "The upper bound ({}) for '{}' must be smaller than the parameter maximum threshold ({})",
+                upper_bound, name, max,
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+/// Range for the maximum capacity of the production store (mm/day).
+#[derive(Debug, Clone, Copy)]
+pub struct X1Range {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+impl ParameterRange for X1Range {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+        Self::check(
+            lower_bound,
+            upper_bound,
+            X1::min_value(),
+            X1::max_value(),
+            X1::description(),
+        )?;
+        Ok(Box::new(Self {
+            lower_bound,
+            upper_bound,
+        }))
+    }
+}
+
+/// Range for one-day-ahead maximum capacity of the routing store (mm/day).
+#[derive(Debug, Clone, Copy)]
+pub struct X2Range {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+impl ParameterRange for X2Range {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+        Self::check(
+            lower_bound,
+            upper_bound,
+            X2::min_value(),
+            X2::max_value(),
+            X2::description(),
+        )?;
+        Ok(Box::new(Self {
+            lower_bound,
+            upper_bound,
+        }))
+    }
+}
+
+/// Range for time base of the unit hydrograph (days).
+#[derive(Debug, Clone, Copy)]
+pub struct X3Range {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+impl ParameterRange for X3Range {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+        Self::check(
+            lower_bound,
+            upper_bound,
+            X3::min_value(),
+            X3::max_value(),
+            X3::description(),
+        )?;
+        Ok(Box::new(Self {
+            lower_bound,
+            upper_bound,
+        }))
+    }
+}
+
+/// Range for the time base of unit hydrograph (days)
+#[derive(Debug, Clone, Copy)]
+pub struct X4Range {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+impl ParameterRange for X4Range {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+        Self::check(
+            lower_bound,
+            upper_bound,
+            X4::min_value(),
+            X4::max_value(),
+            X4::description(),
+        )?;
+        Ok(Box::new(Self {
+            lower_bound,
+            upper_bound,
+        }))
+    }
+}
+
+/// Range for the inter-catchment exchange threshold.
+#[derive(Debug, Clone, Copy)]
+pub struct X5Range {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+impl ParameterRange for X5Range {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+        Self::check(
+            lower_bound,
+            upper_bound,
+            X5::min_value(),
+            X5::max_value(),
+            X5::description(),
+        )?;
+        Ok(Box::new(Self {
+            lower_bound,
+            upper_bound,
+        }))
+    }
+}
+
+/// Range for the time constant of exponential store (mm).
+#[derive(Debug, Clone, Copy)]
+pub struct X6Range {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+impl ParameterRange for X6Range {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+        Self::check(
+            lower_bound,
+            upper_bound,
+            X6::min_value(),
+            X6::max_value(),
+            X6::description(),
+        )?;
+        Ok(Box::new(Self {
+            lower_bound,
+            upper_bound,
+        }))
+    }
+}
+
+/// The data to use to handle the calibration for the catchment or hydrological unit.
+#[derive(Debug, Clone, Copy)]
+pub struct VariableCatchmentData {
+    /// The catchment os sub-catchment area (km2).
+    pub area: f64,
+    /// The range for the maximum capacity of the production store (mm/day)
+    pub x1: X1Range,
+    /// The range for the inter-catchment (or groundwater) exchange coefficient (mm/day).
+    pub x2: X2Range,
+    /// The range for the one-day-ahead maximum capacity of the routing store (mm/day)
+    pub x3: X3Range,
+    /// The range for the time base of unit hydrograph (days)
+    pub x4: X4Range,
+    /// The range for the inter-catchment exchange threshold.
+    pub x5: X5Range,
+    /// The range for the time constant of exponential store (mm)
+    pub x6: X6Range,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parameter::{Parameter, ParameterRange, X1Range, X1};
+
+    #[test]
+    fn test_too_small_parameter() {
+        let x1 = X1::new(0.0);
+        assert_eq!(
+            x1.unwrap_err().to_string(),
+            format!(
+                "The {} must be larger than its minimum threshold ({})",
+                X1::description(),
+                X1::min_value()
+            )
+        )
+    }
+
+    #[test]
+    fn test_too_large_parameter() {
+        let x1 = X1::new(7000.0);
+        assert_eq!(
+            x1.unwrap_err().to_string(),
+            format!(
+                "The {} must be smaller than its maximum threshold ({})",
+                X1::description(),
+                X1::max_value()
+            )
+        )
+    }
+
+    #[test]
+    fn test_too_small_min_bound() {
+        let p = X1Range::new(-10.0, 100.0);
+        assert_eq!(
+            p.unwrap_err().to_string(),
+            format!(
+                "The lower bound (-10) for '{}' must be larger than the parameter minimum threshold ({})",
+                X1::description(),
+                X1::min_value()
+            )
+        )
+    }
+
+    #[test]
+    fn test_too_large_max_bound() {
+        let p = X1Range::new(0.1, 9000.0);
+        assert_eq!(
+            p.unwrap_err().to_string(),
+            format!(
+                "The upper bound (9000) for '{}' must be smaller than the parameter maximum threshold ({})",
+                X1::description(),
+                X1::max_value()
+            )
+        )
     }
 }

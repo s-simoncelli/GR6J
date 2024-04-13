@@ -6,7 +6,7 @@ use chrono::NaiveDate;
 pub struct ModelStepData {
     /// The time
     pub time: NaiveDate,
-    /// The potential evapotranspiration (PE) (mm)
+    /// The potential evapotranspiration (mm)
     pub evapotranspiration: f64,
     /// The total precipitation (mm)
     pub precipitation: f64,
@@ -20,26 +20,27 @@ pub struct ModelStepData {
     pub actual_evapotranspiration: f64,
     /// Catchment percolation (mm)
     pub percolation: f64,
-    /// [`self.net_rainfall`] - [`self.storage_p`] + [`self.percolation`] (mm)
+    /// [`ModelStepData::net_rainfall`] - [`ModelStepData::storage_p`] + [`ModelStepData::percolation`] (mm)
     pub pr: f64,
     /// Potential third-exchange between catchments (mm)
     pub exchange: f64,
     /// Actual exchange between catchments from routing store (mm)
     pub exchange_from_routing_store: f64,
-    /// Actual exchange between catchments from direct branch (after UH2) (mm)
+    /// Actual exchange between catchments from direct branch (after `UH2`) (mm)
     pub exchange_from_direct_branch: f64,
-    /// Actual total exchange between catchments [`self.exchange_from_routing_store`] + [`self.exchange_from_direct_branch`] + [`self.exchange`] (mm)
+    /// Actual total exchange between catchments [`ModelStepData::exchange_from_routing_store`] + [`ModelStepData::exchange_from_direct_branch`] + [`ModelStepData::exchange`] (mm)
     pub actual_exchange: f64,
     /// Outflow from routing store (mm)
     pub routing_store_outflow: f64,
     /// Outflow from exponential store (mm)
     pub exponential_store_outflow: f64,
-    /// Outflow from UH2 branch after exchange (mm)
+    /// Outflow from `UH2` branch after exchange (mm)
     pub outflow_from_uh2_branch: f64,
     /// Simulated outflow at catchment outlet (mm)
     pub run_off: f64,
 }
 
+/// A vector containing the results ([`ModelStepData`]) for each time step.
 #[derive(Debug)]
 pub struct ModelStepDataVector(pub Vec<ModelStepData>);
 

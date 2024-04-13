@@ -50,9 +50,13 @@ impl Debug for ModelPeriod {
     }
 }
 
+/// Define the type of catchment. This can be one catchment or an aggregation of sub-catchments (or
+/// hydrological units).
 #[derive(Debug)]
 pub enum CatchmentType {
+    /// One catchment with one GR6J model.
     OneCatchment(CatchmentData),
+    /// A list of sub-catchments with multiple GR6J model. Each model will run independently.
     SubCatchments(Vec<CatchmentData>),
 }
 
@@ -61,15 +65,15 @@ pub enum CatchmentType {
 pub struct CatchmentData {
     /// The catchment os sub-catchment area (km2).
     pub area: f64,
-    /// Maximum capacity of the production store (mm/day)
+    /// Maximum capacity of the production store (mm/day).
     pub x1: Box<X1>,
     /// Inter-catchment (or groundwater) exchange coefficient (mm/day). X2 can be positive
     /// or negative to simulate imports or exports of water with deep aquifers or
     /// surrounding catchments.
     pub x2: Box<X2>,
-    /// One-day-ahead maximum capacity of the routing store (mm/day)
+    /// One-day-ahead maximum capacity of the routing store (mm/day).
     pub x3: Box<X3>,
-    /// Time base of unit hydrograph `UH1` (days)
+    /// Time base of unit hydrograph `UH1` (days).
     pub x4: Box<X4>,
     /// Inter-catchment exchange threshold. This is a dimensionless threshold parameter that
     /// allows a change in the direction of the groundwater exchange depending on the capacity
@@ -117,29 +121,31 @@ impl RunOffUnit {
     }
 }
 
+/// Inputs to the GR6J model.
 #[derive(Debug)]
 pub struct GR6JModelInputs {
-    /// Vector of time
+    /// Vector of time.
     pub time: Vec<NaiveDate>,
-    /// Input vector of total precipitation (mm/day)
+    /// Input vector of total precipitation (mm/day).
     pub precipitation: Vec<f64>,
-    /// input vector of potential evapotranspiration (PE) (mm/day)
+    /// input vector of potential evapotranspiration (PE) (mm/day).
     pub evapotranspiration: Vec<f64>,
     /// Area and GR6J parameters for the catchment or a list of areas and parameters if you would
     /// like to divide the catchment into sub-catchments or hydrological units (for example based
-    /// on surface type).
+    /// on surface type). If more than one catchment is supplied, the tool will run the GR6J models
+    /// independently and combine the total flow.
     pub catchment: CatchmentType,
     /// The start and end date of the model. The model can be run on a shorter time period
-    /// compared to `time`
+    /// compared to `time`.
     pub run_period: ModelPeriod,
-    /// The start and end date of the warm-up period. If `None` and `run_period.start` allows,
-    /// the one-year period preceding the `run_period.start` is used.
+    /// The start and end date of the warm-up period. If `None` and [`ModelPeriod::start`] allows,
+    /// the one-year period preceding the [`ModelPeriod::start`] is used.
     pub warmup_period: Option<ModelPeriod>,
     /// Whether to export charts, the simulated run-off and other diagnostic file into a sub-folder
     /// inside the given destination folder. The sub-folder will be named with the run timestamp.
     pub destination: Option<PathBuf>,
     /// The time series of the observed run-off. The time-series and its FDC will be plotted against
-    /// the simulated run-off if [`self.destination`] is provided.
+    /// the simulated run-off if [`GR6JModelInputs::destination`] is provided.
     pub observed_runoff: Option<Vec<f64>>,
     /// Convert the run-off to the desired unit of measurement.
     pub run_off_unit: RunOffUnit,

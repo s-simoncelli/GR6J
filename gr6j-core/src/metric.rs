@@ -7,6 +7,7 @@ pub enum KlingGuptaMethod {
     NonParametric,
 }
 
+/// The type of calibration metric to calculate.
 #[derive(Clone, Copy)]
 pub enum CalibrationMetricType {
     /// The Nash-Sutcliffe efficiency. An efficiency of 1 gives a perfect match of simulated to
@@ -30,10 +31,11 @@ pub enum CalibrationMetricType {
     /// of simulated to observed data. This differs from [`Self::KlingGupta2009`] and
     /// [`Self::KlingGupta2012`] because the alpha component is calculated using the flow percentile
     /// from the flow duration curve instead of using the standard deviation.
-    /// See https://www.tandfonline.com/doi/full/10.1080/02626667.2018.1552002
+    /// See <https://www.tandfonline.com/doi/full/10.1080/02626667.2018.1552002>
     NonParamettricKlingGupta,
 }
 
+/// Calculate a calibration metric by comparing the observed and simulated run-off series.
 pub struct CalibrationMetric<'a> {
     observed: &'a [f64],
     simulated: &'a [f64],

@@ -363,7 +363,7 @@ impl GR6JModel {
                 &runoff_dest,
             )
             .map_err(|e| RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string()))?;
-            debug!("Exported run-off CSV file");
+            debug!("Exported run-off file {}", runoff_dest.to_str().unwrap().to_string());
 
             // Export parameters
             match results.catchment_outputs.len() {
@@ -397,7 +397,7 @@ impl GR6JModel {
                 .map_err(|e| {
                     RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string())
                 })?;
-            debug!("Exported FDC CSV file");
+            debug!("Exported FDC CSV file {}", fdc_dest.to_str().unwrap().to_string());
 
             // Generate charts
             generate_summary_chart(self, &results, destination)
@@ -419,6 +419,7 @@ impl GR6JModel {
             };
             generate_fdc_chart(self, sim_fdc, obs_fdc, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("fdc".to_string(), e.to_string()))?;
+            debug!("Exported flow duration curve chart");
 
             // Export metrics
             if let Some(observed) = &self.observed {
@@ -427,6 +428,7 @@ impl GR6JModel {
                 self.write_metric_file(metric, &metric_dest).map_err(|e| {
                     RunModelError::CannotExportCsv(metric_dest.to_str().unwrap().to_string(), e.to_string())
                 })?;
+                debug!("Exported metric file {}", metric_dest.to_str().unwrap().to_string());
             }
         }
 
@@ -733,7 +735,6 @@ impl GR6JModel {
 mod tests {
     use chrono::{Datelike, NaiveDate, TimeDelta};
     use std::env;
-    use std::error::Error;
     use std::fs::File;
     use std::path::{Path, PathBuf};
     use std::str::FromStr;
@@ -802,12 +803,12 @@ mod tests {
         stop_year: i32,
         start: Option<NaiveDate>,
         end: Option<NaiveDate>,
-        x1: Result<Box<X1>, Box<dyn Error>>,
-        x2: Result<Box<X2>, Box<dyn Error>>,
-        x3: Result<Box<X3>, Box<dyn Error>>,
-        x4: Result<Box<X4>, Box<dyn Error>>,
-        x5: Result<Box<X5>, Box<dyn Error>>,
-        x6: Result<Box<X6>, Box<dyn Error>>,
+        x1: Result<Box<X1>, String>,
+        x2: Result<Box<X2>, String>,
+        x3: Result<Box<X3>, String>,
+        x4: Result<Box<X4>, String>,
+        x5: Result<Box<X5>, String>,
+        x6: Result<Box<X6>, String>,
     }
 
     /// Run the model and compare the results against data generate for the airGR R package.
@@ -904,19 +905,6 @@ mod tests {
             *date += TimeDelta::try_days(d as i64).unwrap();
         }
         t
-    }
-
-    #[test]
-    fn test_too_small_x1() {
-        let x1 = X1::new(0.0);
-        assert_eq!(
-            x1.unwrap_err().to_string(),
-            format!(
-                "The {} must be larger than its minimum threshold ({})",
-                X1::description(),
-                X1::min()
-            )
-        )
     }
 
     #[test]
