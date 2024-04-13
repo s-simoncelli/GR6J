@@ -86,7 +86,7 @@ pub struct CatchmentData {
 }
 
 /// Convert the run-off to the desired unit of measurement
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub enum RunOffUnit {
     #[default]
     /// Keep the run-off in mm*km2/d
@@ -123,13 +123,13 @@ impl RunOffUnit {
 
 /// Inputs to the GR6J model.
 #[derive(Debug)]
-pub struct GR6JModelInputs {
+pub struct GR6JModelInputs<'a> {
     /// Vector of time.
-    pub time: Vec<NaiveDate>,
+    pub time: &'a [NaiveDate],
     /// Input vector of total precipitation (mm/day).
-    pub precipitation: Vec<f64>,
+    pub precipitation: &'a [f64],
     /// input vector of potential evapotranspiration (PE) (mm/day).
-    pub evapotranspiration: Vec<f64>,
+    pub evapotranspiration: &'a [f64],
     /// Area and GR6J parameters for the catchment or a list of areas and parameters if you would
     /// like to divide the catchment into sub-catchments or hydrological units (for example based
     /// on surface type). If more than one catchment is supplied, the tool will run the GR6J models
@@ -146,7 +146,7 @@ pub struct GR6JModelInputs {
     pub destination: Option<PathBuf>,
     /// The time series of the observed run-off. The time-series and its FDC will be plotted against
     /// the simulated run-off if [`GR6JModelInputs::destination`] is provided.
-    pub observed_runoff: Option<Vec<f64>>,
+    pub observed_runoff: Option<&'a [f64]>,
     /// Convert the run-off to the desired unit of measurement.
     pub run_off_unit: RunOffUnit,
 }

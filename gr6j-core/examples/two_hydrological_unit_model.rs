@@ -38,9 +38,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let end = NaiveDate::from_ymd_opt(1998, 12, 31).unwrap();
 
     let inputs = GR6JModelInputs {
-        time,
-        precipitation: precipitation.clone(),
-        evapotranspiration: evapotranspiration.clone(),
+        time: &time,
+        precipitation: &precipitation,
+        evapotranspiration: &evapotranspiration,
         catchment: CatchmentType::SubCatchments(vec![
             CatchmentData {
                 area: 2.0,
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         run_period: ModelPeriod::new(start, end)?,
         warmup_period: None,
         destination: Some(Path::new(r"gr6j-core\examples\results").to_path_buf()),
-        observed_runoff: Some(observed),
+        observed_runoff: Some(&observed),
         run_off_unit: RunOffUnit::NoConversion,
     };
     let mut model = GR6JModel::new(inputs)?;

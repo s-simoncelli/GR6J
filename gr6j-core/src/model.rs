@@ -868,9 +868,9 @@ mod tests {
         };
         let area = catchment_data.area;
         let inputs = GR6JModelInputs {
-            time,
-            precipitation,
-            evapotranspiration,
+            time: &time,
+            precipitation: &precipitation,
+            evapotranspiration: &evapotranspiration,
             catchment: CatchmentType::OneCatchment(catchment_data),
             run_period: ModelPeriod::new(start, end).unwrap(),
             warmup_period: None,
@@ -910,10 +910,12 @@ mod tests {
     #[test]
     fn test_invalid_precipitation_length() {
         let t = build_t_vector();
+        let precipitation = vec![0.0; t.len() - 10];
+        let evapotranspiration = vec![0.0; t.len()];
         let inputs = GR6JModelInputs {
-            time: t.clone(),
-            precipitation: vec![0.0; t.len() - 10],
-            evapotranspiration: vec![0.0; t.len()],
+            time: &t,
+            precipitation: &precipitation,
+            evapotranspiration: &evapotranspiration,
             catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
@@ -932,10 +934,12 @@ mod tests {
     #[test]
     fn test_invalid_evapotranspiration_length() {
         let t = build_t_vector();
+        let precipitation = vec![0.0; t.len()];
+        let evapotranspiration = vec![0.0; t.len() - 10];
         let inputs = GR6JModelInputs {
-            time: t.clone(),
-            precipitation: vec![0.0; t.len()],
-            evapotranspiration: vec![0.0; t.len() - 10],
+            time: &t,
+            precipitation: &precipitation,
+            evapotranspiration: &evapotranspiration,
             catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
@@ -954,10 +958,12 @@ mod tests {
     fn test_non_continuous_dates() {
         let mut t = build_t_vector();
         t[365] += TimeDelta::try_days(3).unwrap();
+        let precipitation = vec![0.0; t.len()];
+        let evapotranspiration = vec![0.0; t.len()];
         let inputs = GR6JModelInputs {
-            time: t.clone(),
-            precipitation: vec![0.0; t.len()],
-            evapotranspiration: vec![0.0; t.len()],
+            time: &t,
+            precipitation: &precipitation,
+            evapotranspiration: &evapotranspiration,
             catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
@@ -975,10 +981,12 @@ mod tests {
     #[test]
     fn test_small_start_date() {
         let t = build_t_vector();
+        let precipitation = vec![0.0; t.len()];
+        let evapotranspiration = vec![0.0; t.len()];
         let inputs = GR6JModelInputs {
-            time: t.clone(),
-            precipitation: vec![0.0; t.len()],
-            evapotranspiration: vec![0.0; t.len()],
+            time: &t,
+            precipitation: &precipitation,
+            evapotranspiration: &evapotranspiration,
             catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(NaiveDate::from_ymd_opt(1999, 1, 1).unwrap(), t[365]).unwrap(),
             warmup_period: None,
@@ -1001,12 +1009,13 @@ mod tests {
             *date += TimeDelta::try_days(d as i64).unwrap();
         }
 
-        let mut p = vec![0.0; t.len()];
-        p[0] = f64::NAN;
+        let mut precipitation = vec![0.0; t.len()];
+        let evapotranspiration = vec![0.0; t.len()];
+        precipitation[0] = f64::NAN;
         let inputs = GR6JModelInputs {
-            time: t.clone(),
-            precipitation: p,
-            evapotranspiration: vec![0.0; t.len()],
+            time: &t,
+            precipitation: &precipitation,
+            evapotranspiration: &evapotranspiration,
             catchment: CatchmentType::OneCatchment(default_catchment_data()),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
@@ -1135,9 +1144,9 @@ mod tests {
         let start = *time.first().unwrap();
         let end = *time.last().unwrap();
         let inputs = GR6JModelInputs {
-            time,
-            precipitation,
-            evapotranspiration,
+            time: &time,
+            precipitation: &precipitation,
+            evapotranspiration: &evapotranspiration,
             catchment: CatchmentType::SubCatchments(vec![hu1, hu2]),
             run_period: ModelPeriod::new(start, end).unwrap(),
             warmup_period: None,
