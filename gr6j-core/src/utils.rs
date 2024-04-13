@@ -9,6 +9,22 @@ pub(crate) fn series_max(series: &[f64]) -> f64 {
         .expect("Cannot calculated max value")
 }
 
+/// Check if a vector contains NaN and returns the indices containing invalid nu,bers.
+///
+/// # Arguments
+///
+/// * `data`: The vector to check.
+///
+/// returns: Vec<String>
+pub(crate) fn vector_nan_indices(data: &[f64]) -> Vec<String> {
+    return data
+        .iter()
+        .enumerate()
+        .filter(|(_, &r)| r.is_nan())
+        .map(|(index, _)| index.to_string())
+        .collect::<Vec<_>>();
+}
+
 /// Calculate the flow duration curve.
 ///
 /// # Arguments
