@@ -9,7 +9,7 @@ use log::{debug, info, warn};
 use crate::chart::{generate_fdc_chart, generate_summary_chart, FDCData};
 use crate::error::{LoadModelError, RunModelError};
 use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
-use crate::metric::{CalibrationMetric, CalibrationMetricType};
+use crate::metric::{CalibrationMetric, ALL_METRIC_TYPES};
 use crate::outputs::{GR6JOutputs, ModelStepData, ModelStepDataVector};
 use crate::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
 use crate::unit_hydrograph::{UnitHydrograph, UnitHydrographInputs, UnitHydrographType};
@@ -712,13 +712,7 @@ impl GR6JModel {
         let mut wtr = Writer::from_path(destination)?;
         wtr.write_record(["Metric", "Value", "Ideal value"])?;
 
-        let metric_types = [
-            CalibrationMetricType::NashSutcliffe,
-            CalibrationMetricType::LogNashSutcliffe,
-            CalibrationMetricType::KlingGupta2009,
-            CalibrationMetricType::KlingGupta2012,
-        ];
-        for metric_type in metric_types.into_iter() {
+        for metric_type in ALL_METRIC_TYPES.into_iter() {
             wtr.write_record([
                 CalibrationMetric::full_name(metric_type),
                 metric.value(metric_type).unwrap().to_string().as_str(),
@@ -733,6 +727,7 @@ impl GR6JModel {
 
 #[cfg(test)]
 mod tests {
+    use crate::error::LoadModelError;
     use chrono::{Datelike, NaiveDate, TimeDelta};
     use std::env;
     use std::fs::File;
@@ -803,12 +798,12 @@ mod tests {
         stop_year: i32,
         start: Option<NaiveDate>,
         end: Option<NaiveDate>,
-        x1: Result<Box<X1>, String>,
-        x2: Result<Box<X2>, String>,
-        x3: Result<Box<X3>, String>,
-        x4: Result<Box<X4>, String>,
-        x5: Result<Box<X5>, String>,
-        x6: Result<Box<X6>, String>,
+        x1: Result<Box<X1>, LoadModelError>,
+        x2: Result<Box<X2>, LoadModelError>,
+        x3: Result<Box<X3>, LoadModelError>,
+        x4: Result<Box<X4>, LoadModelError>,
+        x5: Result<Box<X5>, LoadModelError>,
+        x6: Result<Box<X6>, LoadModelError>,
     }
 
     /// Run the model and compare the results against data generate for the airGR R package.
@@ -823,7 +818,7 @@ mod tests {
     /// * `parameters`: The list of model parameters.
     ///
     /// returns: ()
-    fn compare_against_r_data<'a>(args: CompareInputArgs) {
+    fn compare_against_r_data(args: CompareInputArgs) {
         let expected_data = parse_r_file(test_path().join(args.r_csv_file).as_ref());
         let file = File::open(test_path().join("airGR_L0123001_dataset.csv")).expect("Failed to read CSV file");
         let mut rdr = csv::Reader::from_reader(file);

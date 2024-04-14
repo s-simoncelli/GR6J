@@ -9,6 +9,16 @@ pub enum ModelPeriodError {
 
 #[derive(Error, Debug)]
 pub enum LoadModelError {
+    #[error("The {0} must be larger than its minimum threshold ({1})")]
+    ParameterTooSmall(String, f64),
+    #[error("The {0} must be smaller than its maximum threshold ({1})")]
+    ParameterTooLarge(String, f64),
+    #[error("The lower bound ({0}) for '{1}' must be larger than its upper bound ({2})")]
+    ParameterBounds(f64, String, f64),
+    #[error("The lower bound ({0}) for '{1}' must be larger than the parameter minimum threshold ({2})")]
+    ParameterTooSmallLowerBound(f64, String, f64),
+    #[error("The upper bound ({0}) for '{1}' must be smaller than the parameter maximum threshold ({2})")]
+    ParameterTooLargeUpperBound(f64, String, f64),
     #[error("The time and {0} vectors must have the same length")]
     MismatchedLength(String),
     #[error("{0}")]
@@ -43,6 +53,8 @@ pub enum RunModelError {
     CannotExportCsv(String, String),
     #[error("The {0} chart file cannot be generated because {1}")]
     CannotGenerateChart(String, String),
+    #[error("Cannot load the calibration model #{0} because: {1}")]
+    CalibrationError(usize, String),
 }
 
 #[derive(Error, Debug)]

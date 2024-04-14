@@ -35,6 +35,14 @@ pub enum CalibrationMetricType {
     NonParamettricKlingGupta,
 }
 
+/// An array with all the available metric types
+pub const ALL_METRIC_TYPES: [CalibrationMetricType; 4] = [
+    CalibrationMetricType::NashSutcliffe,
+    CalibrationMetricType::LogNashSutcliffe,
+    CalibrationMetricType::KlingGupta2009,
+    CalibrationMetricType::KlingGupta2012,
+];
+
 /// Calculate a calibration metric by comparing the observed and simulated run-off series.
 pub struct CalibrationMetric<'a> {
     observed: &'a [f64],

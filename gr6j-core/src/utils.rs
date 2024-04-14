@@ -223,6 +223,55 @@ pub(crate) fn assert_approx_array_eq(calculated_values: &[f64], expected_values:
     }
 }
 
+pub mod example {
+    use chrono::NaiveDate;
+    use std::error::Error;
+    use std::fs::File;
+    use std::path::PathBuf;
+
+    pub struct HydrologicalData {
+        /// Vector of time.
+        pub time: Vec<NaiveDate>,
+        /// Input vector of total precipitation (mm/day).
+        pub precipitation: Vec<f64>,
+        /// Input vector of potential evapotranspiration (PE) (mm/day).
+        pub evapotranspiration: Vec<f64>,
+        /// Observed run-off (mm/day).
+        pub observed_runoff: Vec<f64>,
+    }
+
+    pub fn load_data() -> Result<HydrologicalData, Box<dyn Error>> {
+        let mut data_folder = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        data_folder.push(r"src\test_data\airGR_L0123001_dataset.csv");
+
+        // Collect hydrological data
+        let file = File::open(r"gr6j-core\src\test_data\airGR_L0123001_dataset.csv")?;
+        let mut rdr = csv::Reader::from_reader(file);
+
+        let mut time: Vec<NaiveDate> = vec![];
+        let mut precipitation: Vec<f64> = vec![];
+        let mut evapotranspiration: Vec<f64> = vec![];
+        let mut observed_runoff: Vec<f64> = vec![];
+        for result in rdr.records() {
+            let record = result.unwrap();
+            let t = NaiveDate::parse_from_str(record.get(0).unwrap(), "%d/%m/%Y")?;
+            time.push(t);
+            precipitation.push(record.get(1).unwrap().parse::<f64>()?);
+            evapotranspiration.push(record.get(2).unwrap().parse::<f64>()?);
+            let obs = record.get(3).unwrap();
+            let obs = if obs == "NA" { "0.0" } else { obs };
+            observed_runoff.push(obs.parse::<f64>()?);
+        }
+
+        Ok(HydrologicalData {
+            time,
+            precipitation,
+            evapotranspiration,
+            observed_runoff,
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::utils::{assert_approx_array_eq, NaNVec};

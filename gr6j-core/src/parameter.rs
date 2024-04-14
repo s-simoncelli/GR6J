@@ -1,24 +1,23 @@
+use crate::error::LoadModelError;
 use std::fmt;
 use std::fmt::Formatter;
 
 pub trait Parameter<'a>: fmt::Display {
-    fn new(value: f64) -> Result<Box<Self>, String>;
+    fn new(value: f64) -> Result<Box<Self>, LoadModelError>;
 
     /// Check that a value is within the min and max parameter bounds.
-    fn check(value: f64) -> Result<(), String> {
+    fn check(value: f64) -> Result<(), LoadModelError> {
         // check min
         if value < Self::min_value() {
-            return Err(format!(
-                "The {} must be larger than its minimum threshold ({})",
-                Self::description(),
+            return Err(LoadModelError::ParameterTooSmall(
+                Self::description().to_string(),
                 Self::min_value(),
             ));
         }
         // check max
         if value > Self::max_value() {
-            return Err(format!(
-                "The {} must be smaller than its maximum threshold ({})",
-                Self::description(),
+            return Err(LoadModelError::ParameterTooLarge(
+                Self::description().to_string(),
                 Self::max_value(),
             ));
         }
@@ -47,7 +46,7 @@ pub trait Parameter<'a>: fmt::Display {
 pub struct X1(f64);
 
 impl<'a> Parameter<'a> for X1 {
-    fn new(value: f64) -> Result<Box<Self>, String> {
+    fn new(value: f64) -> Result<Box<Self>, LoadModelError> {
         X1::check(value)?;
         Ok(Box::new(Self(value)))
     }
@@ -86,7 +85,7 @@ impl fmt::Display for X1 {
 pub struct X2(f64);
 
 impl<'a> Parameter<'a> for X2 {
-    fn new(value: f64) -> Result<Box<Self>, String> {
+    fn new(value: f64) -> Result<Box<Self>, LoadModelError> {
         X2::check(value)?;
         Ok(Box::new(Self(value)))
     }
@@ -123,7 +122,7 @@ impl fmt::Display for X2 {
 pub struct X3(f64);
 
 impl<'a> Parameter<'a> for X3 {
-    fn new(value: f64) -> Result<Box<Self>, String> {
+    fn new(value: f64) -> Result<Box<Self>, LoadModelError> {
         X3::check(value)?;
         Ok(Box::new(Self(value)))
     }
@@ -160,7 +159,7 @@ impl fmt::Display for X3 {
 pub struct X4(f64);
 
 impl<'a> Parameter<'a> for X4 {
-    fn new(value: f64) -> Result<Box<Self>, String> {
+    fn new(value: f64) -> Result<Box<Self>, LoadModelError> {
         X4::check(value)?;
         Ok(Box::new(Self(value)))
     }
@@ -199,7 +198,7 @@ impl fmt::Display for X4 {
 pub struct X5(f64);
 
 impl<'a> Parameter<'a> for X5 {
-    fn new(value: f64) -> Result<Box<Self>, String> {
+    fn new(value: f64) -> Result<Box<Self>, LoadModelError> {
         X5::check(value)?;
         Ok(Box::new(Self(value)))
     }
@@ -236,7 +235,7 @@ impl fmt::Display for X5 {
 pub struct X6(f64);
 
 impl<'a> Parameter<'a> for X6 {
-    fn new(value: f64) -> Result<Box<Self>, String> {
+    fn new(value: f64) -> Result<Box<Self>, LoadModelError> {
         X6::check(value)?;
         Ok(Box::new(Self(value)))
     }
@@ -270,22 +269,33 @@ impl fmt::Display for X6 {
 
 /// For each model parameter, define the range of values to use during the calibration sub-sampling.
 pub trait ParameterRange {
-    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String>;
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, LoadModelError>;
 
     /// Check that a value is within the min and max parameter bounds.
-    fn check(lower_bound: f64, upper_bound: f64, min: f64, max: f64, name: &str) -> Result<(), String> {
+    fn check(lower_bound: f64, upper_bound: f64, min: f64, max: f64, name: &str) -> Result<(), LoadModelError> {
+        // check bounds
+        if lower_bound > upper_bound {
+            return Err(LoadModelError::ParameterBounds(
+                lower_bound,
+                name.to_string(),
+                upper_bound,
+            ));
+        }
+
         // check min
         if lower_bound < min {
-            return Err(format!(
-                "The lower bound ({}) for '{}' must be larger than the parameter minimum threshold ({})",
-                lower_bound, name, min,
+            return Err(LoadModelError::ParameterTooSmallLowerBound(
+                lower_bound,
+                name.to_string(),
+                min,
             ));
         }
         // check max
         if upper_bound > max {
-            return Err(format!(
-                "The upper bound ({}) for '{}' must be smaller than the parameter maximum threshold ({})",
-                upper_bound, name, max,
+            return Err(LoadModelError::ParameterTooLargeUpperBound(
+                upper_bound,
+                name.to_string(),
+                max,
             ));
         }
 
@@ -301,7 +311,7 @@ pub struct X1Range {
 }
 
 impl ParameterRange for X1Range {
-    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, LoadModelError> {
         Self::check(
             lower_bound,
             upper_bound,
@@ -324,7 +334,7 @@ pub struct X2Range {
 }
 
 impl ParameterRange for X2Range {
-    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, LoadModelError> {
         Self::check(
             lower_bound,
             upper_bound,
@@ -347,7 +357,7 @@ pub struct X3Range {
 }
 
 impl ParameterRange for X3Range {
-    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, LoadModelError> {
         Self::check(
             lower_bound,
             upper_bound,
@@ -370,7 +380,7 @@ pub struct X4Range {
 }
 
 impl ParameterRange for X4Range {
-    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, LoadModelError> {
         Self::check(
             lower_bound,
             upper_bound,
@@ -393,7 +403,7 @@ pub struct X5Range {
 }
 
 impl ParameterRange for X5Range {
-    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, LoadModelError> {
         Self::check(
             lower_bound,
             upper_bound,
@@ -416,7 +426,7 @@ pub struct X6Range {
 }
 
 impl ParameterRange for X6Range {
-    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, String> {
+    fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, LoadModelError> {
         Self::check(
             lower_bound,
             upper_bound,
@@ -476,6 +486,18 @@ mod tests {
                 "The {} must be smaller than its maximum threshold ({})",
                 X1::description(),
                 X1::max_value()
+            )
+        )
+    }
+
+    #[test]
+    fn test_wrong_bounds() {
+        let p = X1Range::new(1000.0, 100.0);
+        assert_eq!(
+            p.unwrap_err().to_string(),
+            format!(
+                "The lower bound (1000) for '{}' must be larger than its upper bound (100)",
+                X1::description()
             )
         )
     }
