@@ -1,4 +1,4 @@
-use crate::inputs::StoreLevels;
+use crate::inputs::{CatchmentType, StoreLevels};
 use chrono::NaiveDate;
 
 /// Outputs from a model time-step (one day)
@@ -51,7 +51,8 @@ pub struct GR6JOutputs {
     pub catchment_outputs: Vec<ModelStepDataVector>,
     /// The vector with the dates.
     pub time: Vec<NaiveDate>,
-    /// The run-off for the catchment or the combined sub-catchment run-off in (m3/day).
+    /// The run-off for the catchment or the combined sub-catchment run-off in the unit of
+    /// measurements specified in [`RunOffUnit`].
     pub run_off: Vec<f64>,
 }
 
@@ -92,4 +93,16 @@ impl ModelStepDataVector {
             .map(|step_data| step_data.store_levels.exponential_store)
             .collect()
     }
+}
+
+/// The model calibration outputs
+#[derive(Debug)]
+pub struct CalibrationOutputs {
+    /// The vector with the dates.
+    pub time: Vec<NaiveDate>,
+    /// The run-off for each simulated model. The size of the vector is [`crate::inputs::CalibrationInputs::sample_size`].
+    pub run_off: Vec<Vec<f64>>,
+    /// The list of model parameters (for one catchment or multiple sub-catchments) for each
+    /// simulated model. The size of this vector is [`crate::inputs::CalibrationInputs::sample_size`].
+    pub parameters: Vec<CatchmentType>,
 }
