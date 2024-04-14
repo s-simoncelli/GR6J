@@ -3,6 +3,7 @@ use ::gr6j::inputs::{
     CatchmentData as RsCatchmentData, CatchmentType as RsCatchmentType, GR6JModelInputs as RsGR6JModelInputs,
     ModelPeriod as RsModelPeriod, RunOffUnit as RsRunOffUnit, StoreLevels as RsStorelevels,
 };
+use ::gr6j::metric::{CalibrationMetric as RsCalibrationMetric, Metric as RsMetric};
 use ::gr6j::model::GR6JModel as RsGR6JModel;
 use ::gr6j::outputs::ModelStepData as RsModelStepData;
 use ::gr6j::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
@@ -392,6 +393,66 @@ impl ModelStepData {
     }
 }
 
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct Metric {
+    name: String,
+    ideal_value: f64,
+    value: f64,
+}
+
+impl Metric {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("Metric(name={},value={})", self.name, self.value))
+    }
+
+    fn __str__(&self) -> String {
+        self.__repr__().unwrap()
+    }
+}
+
+impl From<RsMetric> for Metric {
+    fn from(m: RsMetric) -> Self {
+        Self {
+            name: m.name,
+            ideal_value: m.ideal_value,
+            value: m.value,
+        }
+    }
+}
+
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct CalibrationMetric {
+    nash_sutcliffe: Metric,
+    log_nash_sutcliffe: Metric,
+    kling_gupta2009: Metric,
+    kling_gupta2012: Metric,
+    non_paramettric_kling_gupta: Metric,
+}
+
+impl From<RsCalibrationMetric> for CalibrationMetric {
+    fn from(m: RsCalibrationMetric) -> Self {
+        Self {
+            nash_sutcliffe: m.nash_sutcliffe.into(),
+            log_nash_sutcliffe: m.log_nash_sutcliffe.into(),
+            kling_gupta2009: m.kling_gupta2009.into(),
+            kling_gupta2012: m.kling_gupta2012.into(),
+            non_paramettric_kling_gupta: m.non_parametric_kling_gupta.into(),
+        }
+    }
+}
+
+impl CalibrationMetric {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok("CalibrationMetric()".to_string())
+    }
+
+    fn __str__(&self) -> String {
+        self.__repr__().unwrap()
+    }
+}
+
 impl From<RsModelStepData> for ModelStepData {
     fn from(value: RsModelStepData) -> Self {
         ModelStepData {
@@ -425,6 +486,7 @@ struct GR6JOutputs {
     catchment_outputs: Vec<Vec<ModelStepData>>,
     time: Vec<NaiveDate>,
     run_off: Vec<f64>,
+    metrics: CalibrationMetric,
 }
 
 impl GR6JOutputs {
@@ -471,14 +533,14 @@ impl GR6JModel {
             .try_into()
             .map_err(|e: String| PyValueError::new_err(e))?;
         let inputs = RsGR6JModelInputs {
-            time: inputs.time,
-            precipitation: inputs.precipitation,
-            evapotranspiration: inputs.evapotranspiration,
+            time: &inputs.time,
+            precipitation: &inputs.precipitation,
+            evapotranspiration: &inputs.evapotranspiration,
             catchment,
             run_period,
             warmup_period,
             destination: inputs.destination,
-            observed_runoff: inputs.observed_runoff,
+            observed_runoff: inputs.observed_runoff.as_ref().into(),
             run_off_unit: inputs.run_off_unit.unwrap_or_default().into(),
         };
         let model = GR6JModel {
@@ -521,6 +583,7 @@ impl GR6JModel {
             catchment_outputs: model_results,
             time: results.time,
             run_off: results.run_off,
+            metrics: results.metrics.into(),
         })
     }
 }
@@ -529,6 +592,8 @@ impl GR6JModel {
 fn gr6j(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StoreLevels>()?;
     m.add_class::<CatchmentData>()?;
+    m.add_class::<Metric>()?;
+    m.add_class::<CalibrationMetric>()?;
     m.add_class::<ModelPeriod>()?;
     m.add_class::<RunOffUnit>()?;
     m.add_class::<GR6JModelInputs>()?;

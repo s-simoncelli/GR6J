@@ -49,6 +49,8 @@ pub enum RunModelError {
     WrongConversion(),
     #[error("The simulation end date was reached and the model cannot advanced anymore")]
     ReachedSimulationEnd(),
+    #[error("The simulation metrics cannot be calculated because {0}")]
+    CannotCalculateMetrics(String),
     #[error("The CSV file '{0}' cannot be exported because {1}")]
     CannotExportCsv(String, String),
     #[error("The {0} chart file cannot be generated because {1}")]

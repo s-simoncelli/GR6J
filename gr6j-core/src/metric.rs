@@ -1,4 +1,7 @@
 use crate::utils::{calculate_fdc, NaNVec};
+use csv::Writer;
+use std::fs::File;
+use std::path::PathBuf;
 
 /// The method to use to calculate the Kling-Gupta coefficient
 pub enum KlingGuptaMethod {
@@ -7,49 +10,46 @@ pub enum KlingGuptaMethod {
     NonParametric,
 }
 
+//. A metric data
+#[derive(Debug, Clone)]
+pub struct Metric {
+    /// The metric name
+    pub name: String,
+    /// The metric ideal value.
+    pub ideal_value: f64,
+    /// The metric value from the difference between the observed and simulated data.
+    pub value: f64,
+}
+
 /// The type of calibration metric to calculate.
-#[derive(Clone, Copy)]
-pub enum CalibrationMetricType {
+#[derive(Debug, Clone)]
+pub struct CalibrationMetric {
     /// The Nash-Sutcliffe efficiency. An efficiency of 1 gives a perfect match of simulated to
     /// observed data. An efficiency of 0 indicates that the model predictions are as accurate as
     /// the mean of the observations, whereas an efficiency less than zero occurs when the
     /// observed mean is a better predictor than the model.   
-    NashSutcliffe,
+    pub nash_sutcliffe: Metric,
     /// The Nash-Sutcliffe efficiency but the logarithm is applied to flow data to give more
     /// importance to low flow periods. An efficiency of 1 gives a perfect match of simulated to
     /// observed data.
-    LogNashSutcliffe,
+    pub log_nash_sutcliffe: Metric,
     /// The 2009 Kling-Gupta efficiency metric. An efficiency of 1 gives a perfect match
     /// of simulated to observed data. To calculate the alpha component the standard deviation is
     /// used.
-    KlingGupta2009,
+    pub kling_gupta2009: Metric,
     /// The 2012 Kling-Gupta efficiency metric. An efficiency of 1 gives a perfect match
     /// of simulated to observed data. To calculate the alpha component the ratio of the standard
     /// deviation and the mean is used.
-    KlingGupta2012,
+    pub kling_gupta2012: Metric,
     /// The non-parametric Kling-Gupta efficiency metric. An efficiency of 1 gives a perfect match
-    /// of simulated to observed data. This differs from [`Self::KlingGupta2009`] and
-    /// [`Self::KlingGupta2012`] because the alpha component is calculated using the flow percentile
-    /// from the flow duration curve instead of using the standard deviation.
+    /// of simulated to observed data. This differs from [`CalibrationMetric::kling_gupta2009`] and
+    /// [`CalibrationMetric::kling_gupta2012`] because the alpha component is calculated using the
+    /// flow percentile from the flow duration curve instead of using the standard deviation.
     /// See <https://www.tandfonline.com/doi/full/10.1080/02626667.2018.1552002>
-    NonParamettricKlingGupta,
+    pub non_parametric_kling_gupta: Metric,
 }
 
-/// An array with all the available metric types
-pub const ALL_METRIC_TYPES: [CalibrationMetricType; 4] = [
-    CalibrationMetricType::NashSutcliffe,
-    CalibrationMetricType::LogNashSutcliffe,
-    CalibrationMetricType::KlingGupta2009,
-    CalibrationMetricType::KlingGupta2012,
-];
-
-/// Calculate a calibration metric by comparing the observed and simulated run-off series.
-pub struct CalibrationMetric<'a> {
-    observed: &'a [f64],
-    simulated: &'a [f64],
-}
-
-impl<'a> CalibrationMetric<'a> {
+impl<'a> CalibrationMetric {
     pub fn new(observed: &'a [f64], simulated: &'a [f64]) -> Result<Self, String> {
         if observed.len() != simulated.len() {
             return Err(format!(
@@ -59,64 +59,118 @@ impl<'a> CalibrationMetric<'a> {
             ));
         }
 
-        Ok(Self { observed, simulated })
+        Ok(Self {
+            nash_sutcliffe: Metric {
+                name: "Nash-Sutcliffe".to_string(),
+                ideal_value: 0.0,
+                value: Self::nse(observed, simulated),
+            },
+            log_nash_sutcliffe: Metric {
+                name: "Nash-Sutcliffe with log flows".to_string(),
+                ideal_value: 1.0,
+                value: Self::nse(NaNVec(observed).log().as_slice(), NaNVec(simulated).log().as_slice()),
+            },
+            kling_gupta2009: Metric {
+                name: "Kling-Gupta (2009)".to_string(),
+                ideal_value: 1.0,
+                value: Self::kge(observed, simulated, KlingGuptaMethod::Y2009),
+            },
+            kling_gupta2012: Metric {
+                name: "Kling-Gupta (2012)".to_string(),
+                ideal_value: 1.0,
+                value: Self::kge(observed, simulated, KlingGuptaMethod::Y2012),
+            },
+            non_parametric_kling_gupta: Metric {
+                name: "Non-parametric Kling-Gupta".to_string(),
+                ideal_value: 1.0,
+                value: Self::kge(observed, simulated, KlingGuptaMethod::NonParametric),
+            },
+        })
     }
 
-    /// Get the metric full name.
+    /// Append the metric values to a CSV file as row.
     ///
     /// # Arguments
     ///
-    /// * `metric_type`: The type of metric.
+    /// * `wtr`: The file writer.
+    /// * `index`: A string to write as index to identify the row number.
     ///
-    /// returns: &str
-    pub fn full_name(metric_type: CalibrationMetricType) -> &'a str {
-        match metric_type {
-            CalibrationMetricType::NashSutcliffe => "Nash-Sutcliffe",
-            CalibrationMetricType::LogNashSutcliffe => "Nash-Sutcliffe with log flows",
-            CalibrationMetricType::KlingGupta2009 => "Kling-Gupta (2009)",
-            CalibrationMetricType::KlingGupta2012 => "Kling-Gupta (2012)",
-            CalibrationMetricType::NonParamettricKlingGupta => "Non-parametric Kling-Gupta",
+    /// returns: Result<(), csv::Error>
+    pub fn append_row_to_csv(&self, wtr: &mut Writer<File>, index: Option<String>) -> Result<(), csv::Error> {
+        let mut row = vec![];
+        if let Some(i) = index {
+            row.push(i);
         }
+        row.push(self.nash_sutcliffe.value.to_string());
+        row.push(self.log_nash_sutcliffe.value.to_string());
+        row.push(self.kling_gupta2009.value.to_string());
+        row.push(self.kling_gupta2012.value.to_string());
+        row.push(self.non_parametric_kling_gupta.value.to_string());
+        wtr.write_record(row)?;
+
+        Ok(())
     }
 
-    /// Get the ideal value for a metric.
+    /// Append the header row with the metric names to a CSV file.
     ///
     /// # Arguments
     ///
-    /// * `metric_type`: The type of metric.
+    /// * `wtr`: The file writer.
+    /// * `index`: A string to write to identify the index name in the header.
     ///
-    /// returns: &str
-    pub fn ideal_value(metric_type: CalibrationMetricType) -> f64 {
-        match metric_type {
-            CalibrationMetricType::NashSutcliffe => 1.0,
-            CalibrationMetricType::LogNashSutcliffe => 1.0,
-            CalibrationMetricType::KlingGupta2009 => 1.0,
-            CalibrationMetricType::KlingGupta2012 => 1.0,
-            CalibrationMetricType::NonParamettricKlingGupta => 1.0,
+    /// returns: Result<(), csv::Error>
+    pub fn append_header_to_csv(&self, wtr: &mut Writer<File>, index: Option<String>) -> Result<(), csv::Error> {
+        let mut row = vec![];
+        if let Some(i) = index {
+            row.push(i);
         }
+        row.push(self.nash_sutcliffe.name.to_string());
+        row.push(self.log_nash_sutcliffe.name.to_string());
+        row.push(self.kling_gupta2009.name.to_string());
+        row.push(self.kling_gupta2012.name.to_string());
+        row.push(self.non_parametric_kling_gupta.name.to_string());
+        wtr.write_record(row)?;
+
+        Ok(())
     }
 
-    /// Calculate the metric value.
+    /// Export the calibration metric values and their information to a CSV file.
     ///
     /// # Arguments
     ///
-    /// * `metric_type`: The type of metric to calculate.  
+    /// * `destination`: The destination CSV file.
     ///
-    /// returns: f64
-    pub fn value(&self, metric_type: CalibrationMetricType) -> Result<f64, &str> {
-        let v = match metric_type {
-            CalibrationMetricType::NashSutcliffe => Self::nse(self.observed, self.simulated),
-            CalibrationMetricType::LogNashSutcliffe => Self::nse(
-                NaNVec(self.observed).log().as_slice(),
-                NaNVec(self.simulated).log().as_slice(),
-            ),
-            CalibrationMetricType::KlingGupta2009 => Self::kge(self.observed, self.simulated, KlingGuptaMethod::Y2009),
-            CalibrationMetricType::KlingGupta2012 => Self::kge(self.observed, self.simulated, KlingGuptaMethod::Y2012),
-            CalibrationMetricType::NonParamettricKlingGupta => {
-                Self::kge(self.observed, self.simulated, KlingGuptaMethod::NonParametric)
-            }
-        };
-        Ok(v)
+    /// returns: Result<(), csv::Error>
+    pub fn to_csv(&self, destination: PathBuf) -> Result<(), csv::Error> {
+        let mut wtr = Writer::from_path(destination)?;
+        wtr.write_record(["Metric", "Value", "Ideal value"])?;
+        wtr.write_record([
+            self.nash_sutcliffe.name.to_string(),
+            self.nash_sutcliffe.value.to_string(),
+            self.nash_sutcliffe.ideal_value.to_string(),
+        ])?;
+        wtr.write_record([
+            self.log_nash_sutcliffe.name.to_string(),
+            self.log_nash_sutcliffe.value.to_string(),
+            self.log_nash_sutcliffe.ideal_value.to_string(),
+        ])?;
+        wtr.write_record([
+            self.kling_gupta2009.name.to_string(),
+            self.kling_gupta2009.value.to_string(),
+            self.kling_gupta2009.ideal_value.to_string(),
+        ])?;
+        wtr.write_record([
+            self.kling_gupta2012.name.to_string(),
+            self.kling_gupta2012.value.to_string(),
+            self.kling_gupta2012.ideal_value.to_string(),
+        ])?;
+        wtr.write_record([
+            self.non_parametric_kling_gupta.name.to_string(),
+            self.non_parametric_kling_gupta.value.to_string(),
+            self.non_parametric_kling_gupta.ideal_value.to_string(),
+        ])?;
+
+        Ok(())
     }
 
     /// Calculate the Nash-Sutcliffe efficiency. A perfect model simulation returns 1.0.
@@ -191,7 +245,7 @@ impl<'a> CalibrationMetric<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::metric::{CalibrationMetric, CalibrationMetricType};
+    use crate::metric::CalibrationMetric;
     use float_cmp::{assert_approx_eq, F64Margin};
 
     const A: [f64; 6] = [1250.0, 0.3, 500.0, 5.2, 2.0, 10.0];
@@ -204,146 +258,83 @@ mod tests {
     #[test]
     fn test_ideal_values() {
         let metric = CalibrationMetric::new(&B, &B).unwrap();
-        assert_eq!(
-            metric.value(CalibrationMetricType::NashSutcliffe),
-            Ok(CalibrationMetric::ideal_value(CalibrationMetricType::NashSutcliffe))
-        );
-        assert_eq!(
-            metric.value(CalibrationMetricType::LogNashSutcliffe),
-            Ok(CalibrationMetric::ideal_value(CalibrationMetricType::LogNashSutcliffe))
-        );
+        assert_eq!(metric.nash_sutcliffe.ideal_value, 1.0);
+        assert_eq!(metric.log_nash_sutcliffe.ideal_value, 1.0);
+        assert_eq!(metric.kling_gupta2009.ideal_value, 1.0);
+        assert_eq!(metric.kling_gupta2012.ideal_value, 1.0);
+        assert_eq!(metric.non_parametric_kling_gupta.ideal_value, 1.0);
     }
 
     #[test]
     fn test_nse_metric() {
         let metric = CalibrationMetric::new(&A, &B).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::NashSutcliffe).unwrap(),
-            -0.006497117928065954,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.nash_sutcliffe.value, -0.006497117928065954, MARGINS);
     }
 
     #[test]
     fn test_nse_metric_with_nan_1() {
         let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::NashSutcliffe).unwrap(),
-            0.540371734977912,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.nash_sutcliffe.value, 0.540371734977912, MARGINS);
     }
 
     #[test]
     fn test_nse_metric_with_nan_2() {
         let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::NashSutcliffe).unwrap(),
-            0.5404989162123923,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.nash_sutcliffe.value, 0.5404989162123923, MARGINS);
     }
 
     #[test]
     fn test_log_nse_metric() {
         let metric = CalibrationMetric::new(&A, &B).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::LogNashSutcliffe).unwrap(),
-            0.6930355551239313,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.log_nash_sutcliffe.value, 0.6930355551239313, MARGINS);
     }
 
     #[test]
     fn test_log_nse_metric_with_nan_1() {
         let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::LogNashSutcliffe).unwrap(),
-            0.612135455999324,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.log_nash_sutcliffe.value, 0.612135455999324, MARGINS);
     }
 
     #[test]
     fn test_log_nse_metric_with_nan_2() {
         let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::LogNashSutcliffe).unwrap(),
-            0.6176288105498396,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.log_nash_sutcliffe.value, 0.6176288105498396, MARGINS);
     }
 
     #[test]
     fn test_kg_2009_metric() {
         let metric = CalibrationMetric::new(&A, &B).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::KlingGupta2009).unwrap(),
-            -0.16047005836641337,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.kling_gupta2009.value, -0.16047005836641337, MARGINS);
     }
 
     #[test]
     fn test_kg_2009_metric_with_nan_1() {
         let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::KlingGupta2009).unwrap(),
-            0.13079945561027917,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.kling_gupta2009.value, 0.13079945561027917, MARGINS);
     }
 
     #[test]
     fn test_kg_2009_metric_with_nan_2() {
         let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::KlingGupta2009).unwrap(),
-            0.1481643733978315,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.kling_gupta2009.value, 0.1481643733978315, MARGINS);
     }
 
     #[test]
     fn test_kg_2012_metric() {
         let metric = CalibrationMetric::new(&A, &B).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::KlingGupta2012).unwrap(),
-            0.15721037908744573,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.kling_gupta2012.value, 0.15721037908744573, MARGINS);
     }
 
     #[test]
     fn test_kg_2012_metric_with_nan_1() {
         let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::KlingGupta2012).unwrap(),
-            0.3625714406316686,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.kling_gupta2012.value, 0.3625714406316686, MARGINS);
     }
 
     #[test]
     fn test_kg_2012_metric_with_nan_2() {
         let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
-        assert_approx_eq!(
-            f64,
-            metric.value(CalibrationMetricType::KlingGupta2012).unwrap(),
-            0.3950431057298418,
-            MARGINS
-        );
+        assert_approx_eq!(f64, metric.kling_gupta2012.value, 0.3950431057298418, MARGINS);
     }
 
     #[test]
@@ -351,7 +342,7 @@ mod tests {
         let metric = CalibrationMetric::new(&A, &B).unwrap();
         assert_approx_eq!(
             f64,
-            metric.value(CalibrationMetricType::NonParamettricKlingGupta).unwrap(),
+            metric.non_parametric_kling_gupta.value,
             0.16491320894422312,
             MARGINS
         );
@@ -362,7 +353,7 @@ mod tests {
         let metric = CalibrationMetric::new(&A_NAN, &B).unwrap();
         assert_approx_eq!(
             f64,
-            metric.value(CalibrationMetricType::NonParamettricKlingGupta).unwrap(),
+            metric.non_parametric_kling_gupta.value,
             0.3714685584392162,
             MARGINS
         );
@@ -373,7 +364,7 @@ mod tests {
         let metric = CalibrationMetric::new(&A_NAN, &B_NAN).unwrap();
         assert_approx_eq!(
             f64,
-            metric.value(CalibrationMetricType::NonParamettricKlingGupta).unwrap(),
+            metric.non_parametric_kling_gupta.value,
             0.40091725404120415,
             MARGINS
         );

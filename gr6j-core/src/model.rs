@@ -9,7 +9,7 @@ use log::{debug, info, warn};
 use crate::chart::{generate_fdc_chart, generate_summary_chart, FDCData};
 use crate::error::{LoadModelError, RunModelError};
 use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
-use crate::metric::{CalibrationMetric, ALL_METRIC_TYPES};
+use crate::metric::CalibrationMetric;
 use crate::outputs::{GR6JOutputs, ModelStepData, ModelStepDataVector};
 use crate::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
 use crate::unit_hydrograph::{UnitHydrograph, UnitHydrographInputs, UnitHydrographType};
@@ -347,12 +347,22 @@ impl GR6JModel {
         }
 
         let fdc = calculate_fdc(&total_run_off);
-        let results = GR6JOutputs {
+        let mut results = GR6JOutputs {
             catchment_outputs,
             time,
             run_off: total_run_off,
+            metrics: None,
         };
 
+        // Calculate the simulation metrics
+        if let Some(observed) = &self.observed {
+            results.metrics = Some(
+                CalibrationMetric::new(observed, results.run_off.as_ref())
+                    .map_err(|e| RunModelError::CannotCalculateMetrics(e.to_string()))?,
+            );
+        }
+
+        // Export the data if a destination folder is provided
         if let Some(destination) = &self.destination {
             // Export run-off CSV file
             let runoff_dest = destination.join("Run-off.csv");
@@ -422,13 +432,13 @@ impl GR6JModel {
             debug!("Exported flow duration curve chart");
 
             // Export metrics
-            if let Some(observed) = &self.observed {
+            if let Some(ref metrics) = results.metrics {
                 let metric_dest = destination.join("Metrics.csv");
-                let metric = CalibrationMetric::new(observed, results.run_off.as_ref()).unwrap();
-                self.write_metric_file(metric, &metric_dest).map_err(|e| {
-                    RunModelError::CannotExportCsv(metric_dest.to_str().unwrap().to_string(), e.to_string())
-                })?;
-                debug!("Exported metric file {}", metric_dest.to_str().unwrap().to_string());
+                let metric_dest_string = metric_dest.to_str().unwrap().to_string();
+                metrics
+                    .to_csv(metric_dest)
+                    .map_err(|e| RunModelError::CannotExportCsv(metric_dest_string.clone(), e.to_string()))?;
+                debug!("Exported metric file {}", metric_dest_string);
             }
         }
 
@@ -696,30 +706,6 @@ impl GR6JModel {
             X6::unit(),
             X6::description(),
         ])?;
-        wtr.flush()?;
-        Ok(())
-    }
-
-    /// Export the list of calibration metrics.
-    ///
-    /// # Arguments
-    ///
-    /// * `metric`: The metric struct.
-    /// * `destination`: The path to the CSV file.
-    ///
-    /// returns: Result<(), csv::Error>
-    fn write_metric_file(&self, metric: CalibrationMetric, destination: &Path) -> Result<(), csv::Error> {
-        let mut wtr = Writer::from_path(destination)?;
-        wtr.write_record(["Metric", "Value", "Ideal value"])?;
-
-        for metric_type in ALL_METRIC_TYPES.into_iter() {
-            wtr.write_record([
-                CalibrationMetric::full_name(metric_type),
-                metric.value(metric_type).unwrap().to_string().as_str(),
-                CalibrationMetric::ideal_value(metric_type).to_string().as_str(),
-            ])?;
-        }
-
         wtr.flush()?;
         Ok(())
     }
