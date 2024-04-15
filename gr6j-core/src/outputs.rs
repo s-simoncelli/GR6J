@@ -1,4 +1,5 @@
 use crate::inputs::{CatchmentType, StoreLevels};
+use crate::metric::CalibrationMetric;
 use chrono::NaiveDate;
 
 /// Outputs from a model time-step (one day)
@@ -54,6 +55,9 @@ pub struct GR6JOutputs {
     /// The run-off for the catchment or the combined sub-catchment run-off in the unit of
     /// measurements specified in [`RunOffUnit`].
     pub run_off: Vec<f64>,
+    /// The calibration metrics. This is available only when [`crate::inputs::GR6JModelInputs::observed_runoff`]
+    /// is provided.
+    pub metrics: Option<CalibrationMetric>,
 }
 
 impl ModelStepDataVector {
@@ -95,6 +99,13 @@ impl ModelStepDataVector {
     }
 }
 
+/// The value and ideal value of a calibration metric.
+#[derive(Debug)]
+pub struct CalibrationMetricOutput {
+    pub value: f64,
+    pub ideal_value: f64,
+}
+
 /// The model calibration outputs
 #[derive(Debug)]
 pub struct CalibrationOutputs {
@@ -105,4 +116,7 @@ pub struct CalibrationOutputs {
     /// The list of model parameters (for one catchment or multiple sub-catchments) for each
     /// simulated model. The size of this vector is [`crate::inputs::CalibrationInputs::sample_size`].
     pub parameters: Vec<CatchmentType>,
+    /// The list of calibration metrics for each simulated model. Use this to assess the calibration
+    /// accuracy. The size of this vector is [`crate::inputs::CalibrationInputs::sample_size`].
+    pub metrics: Vec<CalibrationMetric>,
 }
