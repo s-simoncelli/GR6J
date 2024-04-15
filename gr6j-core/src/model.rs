@@ -357,7 +357,7 @@ impl GR6JModel {
         // Calculate the simulation metrics
         if let Some(observed) = &self.observed {
             results.metrics = Some(
-                CalibrationMetric::new(observed, results.run_off.as_ref())
+                CalibrationMetric::new(observed, results.run_off.as_ref(), None)
                     .map_err(|e| RunModelError::CannotCalculateMetrics(e.to_string()))?,
             );
         }
