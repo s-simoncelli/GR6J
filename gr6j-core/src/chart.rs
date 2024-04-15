@@ -1,6 +1,6 @@
 use crate::model::GR6JModel;
 use crate::outputs::GR6JOutputs;
-use crate::utils::series_max;
+use crate::utils::{series_max, Fdc};
 use chrono::{Datelike, NaiveDate};
 use plotters::prelude::full_palette::GREY_A400;
 use plotters::prelude::*;
@@ -110,28 +110,20 @@ pub(crate) fn generate_summary_chart(
     Ok(())
 }
 
-/// Data for a flow duration curve.
-pub struct FDCData {
-    /// The probability of flow exceedence.
-    pub exceedence: Vec<f64>,
-    /// The run-off corresponding to the exceedence probability.
-    pub run_off: Vec<f64>,
-}
-
 /// Generate the chart with the FDCs.
 ///
 /// # Arguments
 ///
 /// * `model`: The GR6JModel struct.
-/// * `simulated`: The FDCData struct for the FDC of the simulated run-off.
-/// * `observed`: The FDCData struct for the FDC of the observed run-off.
+/// * `simulated`: The FDC struct for the FDC of the simulated run-off.
+/// * `observed`: The FDC struct for the FDC of the observed run-off.
 /// * `destination`: The folder where to save the chart file.
 ///
 /// returns: Result<(), Box<dyn std::error::Error>>
 pub(crate) fn generate_fdc_chart(
     model: &GR6JModel,
-    simulated: FDCData,
-    observed: Option<FDCData>,
+    simulated: Fdc,
+    observed: Option<Fdc>,
     destination: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let full_file = destination.join("FDC.png");
@@ -142,9 +134,9 @@ pub(crate) fn generate_fdc_chart(
     let panels = root_area.split_evenly((2, 1));
 
     let has_observed = observed.as_ref().is_some();
-    let mut q_max = series_max(&simulated.run_off);
+    let mut q_max = series_max(&simulated.sorted_run_off);
     if has_observed {
-        let observed = &observed.as_ref().unwrap().run_off;
+        let observed = &observed.as_ref().unwrap().sorted_run_off;
         q_max = q_max.max(series_max(observed));
     }
     if q_max > 1.0 {
@@ -182,7 +174,7 @@ pub(crate) fn generate_fdc_chart(
         simulated
             .exceedence
             .iter()
-            .zip(simulated.run_off.clone())
+            .zip(simulated.sorted_run_off.clone())
             .map(|(t, p)| (*t, p)),
         sim_style,
     ))?
@@ -207,7 +199,11 @@ pub(crate) fn generate_fdc_chart(
         .draw()?;
 
     cc2.draw_series(LineSeries::new(
-        simulated.exceedence.iter().zip(simulated.run_off).map(|(t, p)| (*t, p)),
+        simulated
+            .exceedence
+            .iter()
+            .zip(simulated.sorted_run_off)
+            .map(|(t, p)| (*t, p)),
         sim_style,
     ))?
     .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], sim_style.color.to_rgba()))
@@ -216,14 +212,14 @@ pub(crate) fn generate_fdc_chart(
     if has_observed {
         let fdc = observed.unwrap();
         cc1.draw_series(LineSeries::new(
-            fdc.exceedence.iter().zip(&fdc.run_off).map(|(t, p)| (*t, *p)),
+            fdc.exceedence.iter().zip(&fdc.sorted_run_off).map(|(t, p)| (*t, *p)),
             obs_style,
         ))?
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], obs_style.color.to_rgba()))
         .label("Observed");
 
         cc2.draw_series(LineSeries::new(
-            fdc.exceedence.iter().zip(fdc.run_off).map(|(t, p)| (*t, p)),
+            fdc.exceedence.iter().zip(fdc.sorted_run_off).map(|(t, p)| (*t, p)),
             obs_style,
         ))?
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], obs_style.color.to_rgba()))

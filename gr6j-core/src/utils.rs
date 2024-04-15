@@ -1,5 +1,7 @@
+use csv::Writer;
 use float_cmp::{approx_eq, F64Margin};
 use ndarray::Array;
+use std::path::PathBuf;
 
 /// Get the series max value
 pub(crate) fn series_max(series: &[f64]) -> f64 {
@@ -25,18 +27,50 @@ pub(crate) fn vector_nan_indices(data: &[f64]) -> Vec<String> {
         .collect::<Vec<_>>();
 }
 
-/// Calculate the flow duration curve.
-///
-/// # Arguments
-///
-/// * `run_off`: The run-off data.
-///
-/// returns: (`Vec<f64>`,` Vec<f64>`) The probability of exceedence (0-190) and the sorted run-off data.
-pub fn calculate_fdc(run_off: &[f64]) -> (Vec<f64>, Vec<f64>) {
-    let exceedence = Array::range(1., run_off.len() as f64 + 1.0, 1.0) / run_off.len() as f64 * 100.0;
+/// Calculate the flow duration curve
+pub struct Fdc {
+    /// The probability of exceedence (0-100)
+    pub exceedence: Vec<f64>,
+    /// The sorted run-off data to plot against the probability.
+    pub sorted_run_off: Vec<f64>,
+}
 
-    let sorted_run_off = NaNVec(run_off).sort(SortType::Asc);
-    (exceedence.to_vec(), sorted_run_off.to_vec())
+impl Fdc {
+    /// Calculate the flow duration curve.
+    ///
+    /// # Arguments
+    ///
+    /// * `run_off`: The run-off time series.
+    ///
+    /// returns: Fdc
+    pub fn new(run_off: &[f64]) -> Self {
+        let exceedence = Array::range(1., run_off.len() as f64 + 1.0, 1.0) / run_off.len() as f64 * 100.0;
+        let sorted_run_off = NaNVec(run_off).sort(SortType::Asc);
+
+        Self {
+            exceedence: exceedence.to_vec(),
+            sorted_run_off: sorted_run_off.to_vec(),
+        }
+    }
+
+    /// Export theflow duration curve and to a CSV file.
+    ///
+    /// # Arguments
+    ///
+    /// * `destination`: The destination CSV file.
+    /// * `run_off_unit`: The run-off unit of measurement.
+    ///
+    /// returns: Result<(), csv::Error>
+    pub fn to_csv(&self, destination: &PathBuf, run_off_unit: &str) -> Result<(), csv::Error> {
+        let mut wtr = Writer::from_path(destination)?;
+        wtr.write_record(["Percentage exceedance", format!("Run-off ({})", run_off_unit).as_str()])?;
+
+        for (pct, q) in self.exceedence.iter().zip(&self.sorted_run_off) {
+            wtr.write_record([pct.to_string(), q.to_string()])?;
+            wtr.flush()?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(PartialEq)]

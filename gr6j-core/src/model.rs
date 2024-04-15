@@ -6,14 +6,14 @@ use chrono::{Local, NaiveDate, TimeDelta};
 use csv::Writer;
 use log::{debug, info, warn};
 
-use crate::chart::{generate_fdc_chart, generate_summary_chart, FDCData};
+use crate::chart::{generate_fdc_chart, generate_summary_chart};
 use crate::error::{LoadModelError, RunModelError};
 use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
 use crate::metric::CalibrationMetric;
 use crate::outputs::{GR6JOutputs, ModelStepData, ModelStepDataVector};
 use crate::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
 use crate::unit_hydrograph::{UnitHydrograph, UnitHydrographInputs, UnitHydrographType};
-use crate::utils::{calculate_fdc, vector_nan_indices};
+use crate::utils::{vector_nan_indices, Fdc};
 
 /// Internal state variables
 #[derive(Debug)]
@@ -346,7 +346,7 @@ impl GR6JModel {
             total_run_off.push(q);
         }
 
-        let fdc = calculate_fdc(&total_run_off);
+        let sim_fdc = Fdc::new(&total_run_off);
         let mut results = GR6JOutputs {
             catchment_outputs,
             time,
@@ -403,29 +403,18 @@ impl GR6JModel {
 
             // Export FDC
             let fdc_dest = destination.join("FDC.csv");
-            self.write_fdc_file(&fdc.0, &fdc.1, self.run_off_unit.unit_label(), &fdc_dest)
-                .map_err(|e| {
-                    RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string())
-                })?;
+            sim_fdc.to_csv(&fdc_dest, self.run_off_unit.unit_label()).map_err(|e| {
+                RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string())
+            })?;
             debug!("Exported FDC CSV file {}", fdc_dest.to_str().unwrap().to_string());
 
             // Generate charts
             generate_summary_chart(self, &results, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("summary".to_string(), e.to_string()))?;
 
-            let sim_fdc = FDCData {
-                exceedence: fdc.0,
-                run_off: fdc.1,
-            };
             let obs_fdc = match &self.observed {
                 None => None,
-                Some(q) => {
-                    let fdc = calculate_fdc(q);
-                    Some(FDCData {
-                        exceedence: fdc.0,
-                        run_off: fdc.1,
-                    })
-                }
+                Some(q) => Some(Fdc::new(&q)),
             };
             generate_fdc_chart(self, sim_fdc, obs_fdc, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("fdc".to_string(), e.to_string()))?;
@@ -625,33 +614,6 @@ impl GR6JModel {
 
         for (step_index, q) in total_run_off.iter().enumerate() {
             wtr.write_record(&[time[step_index].to_string(), q.to_string()])?;
-            wtr.flush()?;
-        }
-        Ok(())
-    }
-
-    /// Export the FDC to a CSV file.
-    ///
-    /// # Arguments
-    ///
-    /// * `percentiles`: The vector of percentiles.
-    /// * `flow_rate`: The flow rate.
-    /// * `run_off_unit`: The run-off unit of measurement.
-    /// * `destination`: The path to the CSV file.
-    ///
-    /// returns: Result<(), csv::Error>
-    fn write_fdc_file(
-        &self,
-        percentiles: &[f64],
-        flow_rate: &[f64],
-        run_off_unit: &str,
-        destination: &Path,
-    ) -> Result<(), csv::Error> {
-        let mut wtr = Writer::from_path(destination)?;
-        wtr.write_record(["Percentage exceedance", format!("Run-off ({})", run_off_unit).as_str()])?;
-
-        for (pct, q) in percentiles.iter().zip(flow_rate) {
-            wtr.write_record([pct.to_string(), q.to_string()])?;
             wtr.flush()?;
         }
         Ok(())
@@ -1007,7 +969,7 @@ mod tests {
         let model = GR6JModel::new(inputs);
         assert_eq!(
             model.unwrap_err().to_string(),
-            "The precipitation series contains at least one NA value. Missing values are not allowed".to_string()
+            "The precipitation series contains at least one NA value at the following indices: [\"0\"]. Missing values are not allowed".to_string()
         );
     }
 

@@ -1,4 +1,4 @@
-use crate::utils::{calculate_fdc, NaNVec};
+use crate::utils::{Fdc, NaNVec};
 use csv::Writer;
 use std::fs::File;
 use std::path::PathBuf;
@@ -272,15 +272,20 @@ impl<'a> CalibrationMetric {
                     .iter()
                     .map(|x| x / (obs_mean * observed.len() as f64))
                     .collect();
-                let (_, obs_fdc) = calculate_fdc(scaled_obs.as_slice());
+                let obs_fdc = Fdc::new(scaled_obs.as_slice());
 
                 let scaled_sim: Vec<f64> = simulated
                     .iter()
                     .map(|x| x / (sim_mean * simulated.len() as f64))
                     .collect();
-                let (_, sim_fdc) = calculate_fdc(scaled_sim.as_slice());
+                let sim_fdc = Fdc::new(scaled_sim.as_slice());
 
-                let deltas: f64 = sim_fdc.iter().zip(obs_fdc).map(|(x1, x2)| (x1 - x2).abs()).sum();
+                let deltas: f64 = sim_fdc
+                    .sorted_run_off
+                    .iter()
+                    .zip(obs_fdc.sorted_run_off)
+                    .map(|(x1, x2)| (x1 - x2).abs())
+                    .sum();
                 1.0 - 0.5 * deltas
             }
         };
