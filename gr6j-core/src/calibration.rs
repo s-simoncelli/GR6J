@@ -18,8 +18,7 @@ use std::mem;
 use std::path::PathBuf;
 
 /// Perform the model calibration to pick the best calibration parameters using comparison charts
-/// for the flow and flow duration curves and calibration metrics (such as Nash-Sutcliffe). For
-/// a list of the metrics that are calculated see [`gr6j::metric::CalibrationMetricType`].
+/// for the flow and flow duration curves and calibration metrics (such as Nash-Sutcliffe).
 ///
 /// The calibration steps are as follows:
 ///   1) Generate [`CalibrationInputs::sample_size`] samples using the Latin Hyper-cube sampling technique.
@@ -50,13 +49,13 @@ struct ParData {
 
 impl<'a> Calibration<'a> {
     /// Initialise the GR6J models to run for the calibration. This will initialise the inputs of
-    /// [`Calibration::sample_size`] GR6J models with a different combination of parameters.
-    /// [`GR6JModelInputs`]
+    /// [`crate::inputs::CalibrationInputs::sample_size`] GR6J models with a different combination
+    /// of parameters.
     /// # Arguments
     ///
     /// * `inputs`: The calibration input data.
     ///
-    /// returns: Result<Calibration, LoadModelError>
+    /// returns: `Result<Calibration, LoadModelError>`
     pub fn new(inputs: CalibrationInputs<'a>) -> Result<Self, LoadModelError> {
         if !inputs.destination.exists() {
             return Err(LoadModelError::DestinationNotFound(
@@ -151,7 +150,7 @@ impl<'a> Calibration<'a> {
     /// Run the calibration. This will run the GR6J models using threads; the parallel loop will
     /// stop if [`GR6JModel`] throws an error.
     ///
-    /// returns: Result<CalibrationOutputs, RunModelError>
+    /// returns: `Result<CalibrationOutputs, RunModelError>`
     pub fn run(&mut self) -> Result<CalibrationOutputs, RunModelError> {
         let run_inputs = self.run_inputs.take().unwrap();
         let time: Vec<NaiveDate> = run_inputs[0].time.to_vec();
@@ -294,7 +293,6 @@ impl<'a> Calibration<'a> {
             [data.x5.lower_bound, data.x5.upper_bound],
             [data.x6.lower_bound, data.x6.upper_bound],
         ]);
-        // We generate five samples using centered Latin Hypercube sampling.
-        Lhs::new(&limits).kind(LhsKind::Centered).sample(sample_size)
+        Lhs::new(&limits).kind(LhsKind::Optimized).sample(sample_size)
     }
 }

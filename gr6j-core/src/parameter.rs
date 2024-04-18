@@ -1,6 +1,6 @@
 use crate::error::LoadModelError;
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Debug, Formatter};
 
 pub trait Parameter<'a>: fmt::Display {
     fn new(value: f64) -> Result<Box<Self>, LoadModelError>;
@@ -301,6 +301,7 @@ pub trait ParameterRange {
 
         Ok(())
     }
+    fn default() -> Box<Self>;
 }
 
 /// Range for the maximum capacity of the production store (mm/day).
@@ -311,6 +312,14 @@ pub struct X1Range {
 }
 
 impl ParameterRange for X1Range {
+    /// Create a new parameter range.
+    ///
+    /// # Arguments
+    ///
+    /// * `lower_bound`: The parameter lower bound.
+    /// * `upper_bound`: The parameter upper bound.
+    ///
+    /// returns: `Result<Box<Self>, LoadModelError>`
     fn new(lower_bound: f64, upper_bound: f64) -> Result<Box<Self>, LoadModelError> {
         Self::check(
             lower_bound,
@@ -323,6 +332,13 @@ impl ParameterRange for X1Range {
             lower_bound,
             upper_bound,
         }))
+    }
+
+    /// Use the default parameter range.
+    ///
+    /// returns: `Box<Self>`
+    fn default() -> Box<Self> {
+        Self::new(X1::min_value(), X1::max_value()).unwrap()
     }
 }
 
@@ -347,6 +363,10 @@ impl ParameterRange for X2Range {
             upper_bound,
         }))
     }
+
+    fn default() -> Box<Self> {
+        Self::new(0.0, 0.0).unwrap()
+    }
 }
 
 /// Range for time base of the unit hydrograph (days).
@@ -369,6 +389,10 @@ impl ParameterRange for X3Range {
             lower_bound,
             upper_bound,
         }))
+    }
+
+    fn default() -> Box<Self> {
+        Self::new(X3::min_value(), X3::max_value()).unwrap()
     }
 }
 
@@ -393,6 +417,10 @@ impl ParameterRange for X4Range {
             upper_bound,
         }))
     }
+
+    fn default() -> Box<Self> {
+        Self::new(X4::min_value(), X4::max_value()).unwrap()
+    }
 }
 
 /// Range for the inter-catchment exchange threshold.
@@ -416,6 +444,10 @@ impl ParameterRange for X5Range {
             upper_bound,
         }))
     }
+
+    fn default() -> Box<Self> {
+        Self::new(0.0, 0.0).unwrap()
+    }
 }
 
 /// Range for the time constant of exponential store (mm).
@@ -438,6 +470,10 @@ impl ParameterRange for X6Range {
             lower_bound,
             upper_bound,
         }))
+    }
+
+    fn default() -> Box<Self> {
+        Self::new(X6::min_value(), X6::max_value()).unwrap()
     }
 }
 

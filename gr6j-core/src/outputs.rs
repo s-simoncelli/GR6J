@@ -1,4 +1,3 @@
-use crate::calibration::Calibration;
 use crate::inputs::{CatchmentType, StoreLevels};
 use crate::metric::CalibrationMetric;
 use chrono::NaiveDate;
@@ -54,7 +53,7 @@ pub struct GR6JOutputs {
     /// The vector with the dates.
     pub time: Vec<NaiveDate>,
     /// The run-off for the catchment or the combined sub-catchment run-off in the unit of
-    /// measurements specified in [`RunOffUnit`].
+    /// measurements specified in [`crate::inputs::RunOffUnit`].
     pub run_off: Vec<f64>,
     /// The calibration metrics. This is available only when [`crate::inputs::GR6JModelInputs::observed_runoff`]
     /// is provided.

@@ -79,12 +79,6 @@ impl GR6JModel {
     /// * `inputs`: The `GR6JModelInputs` struct containing the model input data.
     ///
     /// returns: `Result<Self, LoadModelError>`
-    ///
-    /// # Examples
-    ///
-    /// ```
-    ///
-    /// ```
     pub fn new(inputs: GR6JModelInputs) -> Result<Self, LoadModelError> {
         // Check hydrological data
         if inputs.time.len() != inputs.precipitation.len() {
@@ -405,10 +399,7 @@ impl GR6JModel {
             generate_summary_chart(self, &results, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("summary".to_string(), e.to_string()))?;
 
-            let obs_fdc = match &self.observed {
-                None => None,
-                Some(q) => Some(Fdc::new(&q)),
-            };
+            let obs_fdc = self.observed.as_ref().map(|q| Fdc::new(q));
             generate_fdc_chart(self, sim_fdc, obs_fdc, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("fdc".to_string(), e.to_string()))?;
             debug!("Exported flow duration curve chart");
@@ -455,6 +446,7 @@ impl GR6JModel {
         let mut net_p = 0.0;
         let mut pr = 0.0;
         let mut storage_p = 0.0;
+        #[allow(unused_assignments)]
         let mut actual_e = 0.0;
         if p < e {
             let net_e = e - p;
