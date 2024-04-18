@@ -371,17 +371,14 @@ impl GR6JModel {
                 results.run_off.as_ref(),
                 self.run_off_unit.unit_label(),
                 &runoff_dest,
-            )
-            .map_err(|e| RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string()))?;
+            )?;
             debug!("Exported run-off file {}", runoff_dest.to_str().unwrap().to_string());
 
             // Export parameters
             match results.catchment_outputs.len() {
                 1 => {
                     let dest = destination.join("Parameters.csv");
-                    self.write_parameter_file(&self.models[0], &dest).map_err(|e| {
-                        RunModelError::CannotExportCsv(dest.to_str().unwrap().to_string(), e.to_string())
-                    })?;
+                    self.write_parameter_file(&self.models[0], &dest)?;
                     debug!(
                         "Exported parameter CSV files to '{}'",
                         dest.to_str().unwrap().to_string()
@@ -390,9 +387,7 @@ impl GR6JModel {
                 _ => {
                     for (uh, model) in self.models.iter().enumerate() {
                         let dest = destination.join(format!("Parameters_HU{}.csv", uh + 1));
-                        self.write_parameter_file(model, &dest).map_err(|e| {
-                            RunModelError::CannotExportCsv(dest.to_str().unwrap().to_string(), e.to_string())
-                        })?;
+                        self.write_parameter_file(model, &dest)?;
                         debug!(
                             "Exported parameter CSV files to '{}'",
                             dest.to_str().unwrap().to_string()
@@ -403,9 +398,7 @@ impl GR6JModel {
 
             // Export FDC
             let fdc_dest = destination.join("FDC.csv");
-            sim_fdc.to_csv(&fdc_dest, self.run_off_unit.unit_label()).map_err(|e| {
-                RunModelError::CannotExportCsv(runoff_dest.to_str().unwrap().to_string(), e.to_string())
-            })?;
+            sim_fdc.to_csv(&fdc_dest, self.run_off_unit.unit_label())?;
             debug!("Exported FDC CSV file {}", fdc_dest.to_str().unwrap().to_string());
 
             // Generate charts
@@ -424,9 +417,7 @@ impl GR6JModel {
             if let Some(ref metrics) = results.metrics {
                 let metric_dest = destination.join("Metrics.csv");
                 let metric_dest_string = metric_dest.to_str().unwrap().to_string();
-                metrics
-                    .to_csv(metric_dest)
-                    .map_err(|e| RunModelError::CannotExportCsv(metric_dest_string.clone(), e.to_string()))?;
+                metrics.to_csv(metric_dest)?;
                 debug!("Exported metric file {}", metric_dest_string);
             }
         }

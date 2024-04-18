@@ -1,4 +1,6 @@
 use chrono::NaiveDate;
+use csv::Error;
+use std::io;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -51,12 +53,24 @@ pub enum RunModelError {
     ReachedSimulationEnd(),
     #[error("The simulation metrics cannot be calculated because {0}")]
     CannotCalculateMetrics(String),
-    #[error("The CSV file '{0}' cannot be exported because {1}")]
-    CannotExportCsv(String, String),
+    #[error("A CSV file cannot be exported because {0}")]
+    CannotExportCsv(String),
     #[error("The {0} chart file cannot be generated because {1}")]
     CannotGenerateChart(String, String),
     #[error("Cannot load the calibration model #{0} because: {1}")]
     CalibrationError(usize, String),
+}
+
+impl From<csv::Error> for RunModelError {
+    fn from(value: Error) -> Self {
+        RunModelError::CannotExportCsv(value.to_string())
+    }
+}
+
+impl From<io::Error> for RunModelError {
+    fn from(value: io::Error) -> Self {
+        RunModelError::CannotExportCsv(value.to_string())
+    }
 }
 
 #[derive(Error, Debug)]

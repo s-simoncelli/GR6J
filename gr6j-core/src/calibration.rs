@@ -12,15 +12,17 @@ use csv::Writer;
 use egobox_doe::{Lhs, LhsKind, SamplingMethod};
 use log::{debug, info};
 use ndarray::{arr2, s, Array2};
+use rayon::prelude::*;
 use std::fs::create_dir;
-use std::path::{Path, PathBuf};
+use std::mem;
+use std::path::PathBuf;
 
 /// Perform the model calibration to pick the best calibration parameters using comparison charts
 /// for the flow and flow duration curves and calibration metrics (such as Nash-Sutcliffe). For
 /// a list of the metrics that are calculated see [`gr6j::metric::CalibrationMetricType`].
 ///
 /// The calibration steps are as follows:
-///   1) Generate [`CalibrationInputs::sample_size`] samples using the Latin hypercube sampling technique.
+///   1) Generate [`CalibrationInputs::sample_size`] samples using the Latin Hyper-cube sampling technique.
 ///   2) Each sub-sample will contain a random combination of the model parameters based on the
 ///     ranges given in [`CalibrationCatchmentData`].
 ///   3) The toll will run a total of [`CalibrationInputs::sample_size`] models in parallel and generate a set of
@@ -34,17 +36,34 @@ pub struct Calibration<'a> {
     run_inputs: Option<Vec<GR6JModelInputs<'a>>>,
     /// The destination where to save the charts and diagnostic data.
     destination: PathBuf,
-    /// The size of the sample
-    sample_size: usize,
+}
+
+/// The data collected by the parallel loop from each GR6J models.
+struct ParData {
+    /// The data of all hydrological units.
+    catchment: CatchmentType,
+    /// The simulated run-off.
+    run_off: Vec<f64>,
+    /// The metrics to use to assess the model performance.
+    metrics: CalibrationMetric,
 }
 
 impl<'a> Calibration<'a> {
+    /// Initialise the GR6J models to run for the calibration. This will initialise the inputs of
+    /// [`Calibration::sample_size`] GR6J models with a different combination of parameters.
+    /// [`GR6JModelInputs`]
+    /// # Arguments
+    ///
+    /// * `inputs`: The calibration input data.
+    ///
+    /// returns: Result<Calibration, LoadModelError>
     pub fn new(inputs: CalibrationInputs<'a>) -> Result<Self, LoadModelError> {
         if !inputs.destination.exists() {
             return Err(LoadModelError::DestinationNotFound(
                 inputs.destination.to_str().unwrap().to_string(),
             ));
         }
+
         let destination = inputs
             .destination
             .join(Local::now().format("calibration_%Y%m%d_%H%M").to_string());
@@ -126,35 +145,34 @@ impl<'a> Calibration<'a> {
         Ok(Self {
             run_inputs: Some(run_inputs),
             destination,
-            sample_size,
         })
     }
 
-    /// Run the calibration. Error data checking is performed by [`GR6JModelInputs`] and
-    /// [`GR6JModel`].
+    /// Run the calibration. This will run the GR6J models using threads; the parallel loop will
+    /// stop if [`GR6JModel`] throws an error.
     ///
     /// returns: Result<CalibrationOutputs, RunModelError>
     pub fn run(&mut self) -> Result<CalibrationOutputs, RunModelError> {
         let run_inputs = self.run_inputs.take().unwrap();
-        let mut catchment_data: Vec<CatchmentType> = vec![];
-        let mut calibration_metrics: Vec<CalibrationMetric> = vec![];
-        let mut run_off: Vec<Vec<f64>> = vec![];
         let time: Vec<NaiveDate> = run_inputs[0].time.to_vec();
 
-        // TODO move this to another function and return run off
-        // TODO start threads here
-        for (model, model_inputs) in run_inputs.into_iter().enumerate() {
-            info!("Running model #{}", model + 1);
-            let data = model_inputs.catchment.clone();
+        let par_data: Result<Vec<_>, _> = run_inputs
+            .into_par_iter()
+            .enumerate()
+            .map(|(model, model_inputs)| {
+                info!("Running model #{}", model + 1);
+                let data = model_inputs.catchment.clone();
 
-            let mut model =
-                GR6JModel::new(model_inputs).map_err(|e| RunModelError::CalibrationError(model, e.to_string()))?;
-            let results = model.run()?;
-
-            catchment_data.push(data);
-            run_off.push(results.run_off);
-            calibration_metrics.push(results.metrics.unwrap());
-        }
+                let mut model =
+                    GR6JModel::new(model_inputs).map_err(|e| RunModelError::CalibrationError(model, e.to_string()))?;
+                let results = model.run()?;
+                Ok::<ParData, RunModelError>(ParData {
+                    catchment: data,
+                    run_off: results.run_off,
+                    metrics: results.metrics.unwrap(),
+                })
+            })
+            .collect();
 
         // Create the destination folder
         if !self.destination.exists() {
@@ -162,49 +180,99 @@ impl<'a> Calibration<'a> {
                 .map_err(|_| RunModelError::DestinationNotWritable(self.destination.to_str().unwrap().to_string()))?;
         }
 
-        // Export metrics
-        // TODO this is wrong! -> structure not ok - metrics must be in columns
         let metric_dest = self.destination.join("Metrics.csv");
         let metric_dest_string = metric_dest.to_str().unwrap().to_string();
-        debug!("Exporting metric file {}", metric_dest_string);
-        self.write_metric_file(&calibration_metrics, &metric_dest)
-            .map_err(|e| RunModelError::CannotExportCsv(metric_dest_string, e.to_string()))?;
+        let mut metric_wtr = Writer::from_path(metric_dest)?;
+
+        let mut par_data = par_data?;
+
+        // Parameter writers
+        let parameter_header = ["Simulation", "X1", "X2", "X3", "X4", "X5", "X6"];
+        let first_catchment_data = par_data.first().expect("Cannot find any results").catchment.clone();
+        let mut param_files: Vec<String> = vec![];
+        let mut params_wtrs = match first_catchment_data {
+            CatchmentType::OneCatchment(_) => {
+                let destination = self.destination.join("Parameters.csv");
+                param_files.push(destination.to_str().unwrap().to_string());
+                let mut wtr = Writer::from_path(&destination)?;
+                wtr.write_record(parameter_header)?;
+                wtr.flush()?;
+                vec![wtr]
+            }
+            CatchmentType::SubCatchments(p) => {
+                let mut writers = vec![];
+                for ci in 0..p.len() {
+                    let destination = self.destination.join(format!("Parameters_HU{}.csv", ci + 1));
+                    param_files.push(destination.to_str().unwrap().to_string());
+                    let mut wtr = Writer::from_path(&destination)?;
+                    wtr.write_record(parameter_header)?;
+                    wtr.flush()?;
+                    writers.push(wtr);
+                }
+                writers
+            }
+        };
+
+        let mut write_headers = true;
+        for (sim_id, results) in par_data.iter().enumerate() {
+            // Export metrics
+            let metrics = &results.metrics;
+            if write_headers {
+                metrics.append_header_to_csv(&mut metric_wtr, Some("Simulation".to_string()))?;
+            }
+            metrics.append_row_to_csv(&mut metric_wtr, Some(format!("#{}", sim_id + 1)))?;
+            write_headers = false;
+
+            // Export parameters
+            match &results.catchment {
+                CatchmentType::OneCatchment(data) => {
+                    let wtr = &mut params_wtrs[0];
+                    wtr.write_record([
+                        format!("#{}", sim_id),
+                        data.x1.value().to_string(),
+                        data.x2.value().to_string(),
+                        data.x3.value().to_string(),
+                        data.x4.value().to_string(),
+                        data.x5.value().to_string(),
+                        data.x6.value().to_string(),
+                    ])?;
+                    wtr.flush()?;
+                }
+                CatchmentType::SubCatchments(data) => {
+                    for (uh_id, sub_data) in data.iter().enumerate() {
+                        let wtr = &mut params_wtrs[uh_id];
+                        wtr.write_record([
+                            format!("#{}", sim_id),
+                            sub_data.x1.value().to_string(),
+                            sub_data.x2.value().to_string(),
+                            sub_data.x3.value().to_string(),
+                            sub_data.x4.value().to_string(),
+                            sub_data.x5.value().to_string(),
+                            sub_data.x6.value().to_string(),
+                        ])?;
+                        wtr.flush()?;
+                    }
+                }
+            }
+        }
+
+        info!("Exported metric file as '{}'", metric_dest_string);
+        for file_name in param_files.iter() {
+            info!("Exported parameter file as '{}'", file_name);
+        }
+
+        // TODO charts
+
+        let run_off = par_data.iter_mut().map(|d| mem::take(d.run_off.as_mut())).collect();
+        let catchment = par_data.iter_mut().map(|d| d.catchment.clone()).collect();
+        let metrics = par_data.iter_mut().map(|d| d.metrics.clone()).collect();
 
         Ok(CalibrationOutputs {
             time,
             run_off,
-            parameters: catchment_data,
-            metrics: calibration_metrics,
+            catchment,
+            metrics,
         })
-
-        // TODO export parameters -> write separate files for UH
-    }
-
-    /// Write the metric file.
-    ///
-    /// # Arguments
-    ///
-    /// * `metrics`: The vector with the metrics for each simulation.
-    /// * `destination`: The destination CSV file.
-    ///
-    /// returns: Result<(), csv::Error>
-    fn write_metric_file(&self, metrics: &[CalibrationMetric], destination: &PathBuf) -> Result<(), csv::Error> {
-        let mut wtr = Writer::from_path(destination)?;
-        let mut write_header = true;
-
-        for (sim_id, metric) in metrics.iter().enumerate() {
-            if write_header {
-                metric.append_header_to_csv(&mut wtr, Some("Simulation".to_string()))?;
-            }
-            metric.append_row_to_csv(&mut wtr, Some(format!("#{}", sim_id + 1)))?;
-            write_header = false;
-        }
-        Ok(())
-    }
-
-    /// Export a CSV file with the parameter combinations for one catchment.
-    fn write_parameter_combinations(samples: Array2<f64>, destination: &Path) {
-        todo!()
     }
 
     /// Create a sample with combinations of model parameters using the Latin Hypercube sampling.

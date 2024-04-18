@@ -145,6 +145,7 @@ impl<'a> CalibrationMetric {
         }
         row.push(self.non_parametric_kling_gupta.value.to_string());
         wtr.write_record(row)?;
+        wtr.flush()?;
 
         Ok(())
     }
@@ -172,6 +173,7 @@ impl<'a> CalibrationMetric {
         }
         row.push(self.non_parametric_kling_gupta.name.to_string());
         wtr.write_record(row)?;
+        wtr.flush()?;
 
         Ok(())
     }
@@ -215,6 +217,7 @@ impl<'a> CalibrationMetric {
             self.non_parametric_kling_gupta.value.to_string(),
             self.non_parametric_kling_gupta.ideal_value.to_string(),
         ])?;
+        wtr.flush()?;
 
         Ok(())
     }
