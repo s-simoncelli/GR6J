@@ -47,6 +47,14 @@ pub struct CalibrationMetric {
     /// flow percentile from the flow duration curve instead of using the standard deviation.
     /// See <https://www.tandfonline.com/doi/full/10.1080/02626667.2018.1552002>
     pub non_parametric_kling_gupta: Metric,
+    /// The root-mean-square error. A small value indicates an overall small error and better
+    /// simulated run off.
+    pub rmse: Metric,
+    /// The simulation volume error. A value of 0.0 suggests a good simulated flow. A negative value
+    /// indicates that the simulation generates less volume than the observed. A positive value
+    /// indicates instead that the simulation generates more volume than the observed.
+    pub volume_error: Metric,
+    /// A structure controlling whether to calculate additional metrics.
     optional_metrics: OptionalMetrics,
 }
 
@@ -109,6 +117,16 @@ impl<'a> CalibrationMetric {
                 name: "Non-parametric Kling-Gupta".to_string(),
                 ideal_value: 1.0,
                 value: Self::kge(observed, simulated, KlingGuptaMethod::NonParametric),
+            },
+            rmse: Metric {
+                name: "Root-mean-square error".to_string(),
+                ideal_value: 0.0,
+                value: Self::rmse(observed, simulated),
+            },
+            volume_error: Metric {
+                name: "Volume error".to_string(),
+                ideal_value: 0.0,
+                value: Self::volume_error(observed, simulated),
             },
             optional_metrics: optional_metrics.clone(),
         };
@@ -295,6 +313,53 @@ impl<'a> CalibrationMetric {
 
         1.0 - ((r - 1.0).powi(2) + (alpha - 1.0).powi(2) + (beta - 1.0).powi(2)).powf(0.5)
     }
+
+    /// Calculate the root-mean-square deviation. A perfect model simulation returns 0.0.
+    ///
+    /// # Arguments
+    ///
+    /// * `observed`: The vector of observed data.
+    /// * `simulated`: The vector of simulated values.
+    ///
+    /// returns: f64
+    pub fn rmse(observed: &[f64], simulated: &[f64]) -> f64 {
+        let mut error: f64 = 0.0;
+        let mut d: usize = 0;
+        for (obs, sim) in observed.iter().zip(simulated) {
+            if !obs.is_nan() && !sim.is_nan() {
+                error += (obs - sim).powi(2);
+                d += 1;
+            }
+        }
+
+        if d == 0 {
+            f64::NAN
+        } else {
+            (error / d as f64).powf(0.5)
+        }
+    }
+
+    /// Calculate the volume error as difference between the sum of the total simulated and
+    /// observed flow. A good model simulation returns 0.0.
+    ///
+    /// # Arguments
+    ///
+    /// * `observed`: The vector of observed data.
+    /// * `simulated`: The vector of simulated values.
+    ///
+    /// returns: f64
+    pub fn volume_error(observed: &[f64], simulated: &[f64]) -> f64 {
+        let mut obs_volume: f64 = 0.0;
+        let mut sim_volume: f64 = 0.0;
+        for (obs, sim) in observed.iter().zip(simulated) {
+            if !obs.is_nan() && !sim.is_nan() {
+                obs_volume += obs;
+                sim_volume += sim;
+            }
+        }
+
+        (sim_volume / obs_volume - 1.0) * 100.0
+    }
 }
 
 #[cfg(test)]
@@ -426,5 +491,41 @@ mod tests {
             0.40091725404120415,
             MARGINS
         );
+    }
+
+    #[test]
+    fn test_rmse_metric() {
+        let metric = CalibrationMetric::new(&A, &B, OPTIONAL_METRICS).unwrap();
+        assert_approx_eq!(f64, metric.rmse.value, 465.537158004958, MARGINS);
+    }
+
+    #[test]
+    fn test_rmse_metric_with_nan_1() {
+        let metric = CalibrationMetric::new(&A_NAN, &B, OPTIONAL_METRICS).unwrap();
+        assert_approx_eq!(f64, metric.rmse.value, 134.42401042968476, MARGINS);
+    }
+
+    #[test]
+    fn test_rmse_metric_with_nan_2() {
+        let metric = CalibrationMetric::new(&A_NAN, &B_NAN, OPTIONAL_METRICS).unwrap();
+        assert_approx_eq!(f64, metric.rmse.value, 150.26981807735044, MARGINS);
+    }
+
+    #[test]
+    fn test_volume_error_metric() {
+        let metric = CalibrationMetric::new(&A, &B, OPTIONAL_METRICS).unwrap();
+        assert_approx_eq!(f64, metric.volume_error.value, -77.9219236209335, MARGINS);
+    }
+
+    #[test]
+    fn test_volume_error_metric_with_nan_1() {
+        let metric = CalibrationMetric::new(&A_NAN, &B, OPTIONAL_METRICS).unwrap();
+        assert_approx_eq!(f64, metric.volume_error.value, -53.57874396135266, MARGINS);
+    }
+
+    #[test]
+    fn test_volume_error_metric_with_nan_2() {
+        let metric = CalibrationMetric::new(&A_NAN, &B_NAN, OPTIONAL_METRICS).unwrap();
+        assert_approx_eq!(f64, metric.volume_error.value, -55.61970443349754, MARGINS);
     }
 }
