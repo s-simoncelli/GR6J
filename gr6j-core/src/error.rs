@@ -72,11 +72,3 @@ impl From<io::Error> for RunModelError {
         RunModelError::CannotExportCsv(value.to_string())
     }
 }
-
-#[derive(Error, Debug)]
-pub enum FdcError {
-    #[error("The max percentile must be less or equal to 100")]
-    PercentileTooLarge(),
-    #[error("The min percentile must be larger or equal to 0")]
-    PercentileTooSmall(),
-}

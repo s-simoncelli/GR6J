@@ -50,16 +50,6 @@ impl Debug for ModelPeriod {
     }
 }
 
-/// Define the type of catchment. This can be one catchment or an aggregation of sub-catchments (or
-/// hydrological units).
-#[derive(Debug, Clone)]
-pub enum CatchmentType {
-    /// One catchment with one GR6J model.
-    OneCatchment(CatchmentData),
-    /// A list of sub-catchments with multiple GR6J model. Each model will run independently.
-    SubCatchments(Vec<CatchmentData>),
-}
-
 /// The data for the catchment or hydrological unit.
 #[derive(Debug, Clone)]
 pub struct CatchmentData {
@@ -130,11 +120,11 @@ pub struct GR6JModelInputs<'a> {
     pub precipitation: &'a [f64],
     /// input vector of potential evapotranspiration (PE) (mm/day).
     pub evapotranspiration: &'a [f64],
-    /// Area and GR6J parameters for the catchment or a list of areas and parameters if you would
-    /// like to divide the catchment into sub-catchments or hydrological units (for example based
-    /// on surface type). If more than one catchment is supplied, the tool will run the GR6J models
-    /// independently and combine the total flow.
-    pub catchment: CatchmentType,
+    /// Area and GR6J parameters for the model. This can be one catchment or an aggregation of
+    /// sub-catchments in case you want to divide the catchment into independent hydrological units
+    /// (for example based on surface type). If more than one catchment is supplied, the tool will
+    /// run as many GR6J models independently and combine the total flow.
+    pub catchment: Vec<CatchmentData>,
     /// The start and end date of the model. The model can be run on a shorter time period
     /// compared to `time`.
     pub run_period: ModelPeriod,
@@ -170,12 +160,6 @@ pub struct CalibrationCatchmentData {
     pub x6: Box<X6Range>,
 }
 
-#[derive(Debug)]
-pub enum CalibrationCatchmentType {
-    OneCatchment(CalibrationCatchmentData),
-    SubCatchments(Vec<CalibrationCatchmentData>),
-}
-
 /// The calibration inputs.
 pub struct CalibrationInputs<'a> {
     /// Vector of time.
@@ -187,8 +171,9 @@ pub struct CalibrationInputs<'a> {
     /// The time series of the observed run-off. This will be compared against the generated
     /// simulated run-off series to calculate the calibration metrics.
     pub observed_runoff: &'a [f64],
-    /// Area and GR6J parameter ranges for the catchment or a list of areas and parameter ranges.
-    pub catchment: CalibrationCatchmentType,
+    /// Area and GR6J parameter ranges for one catchment or a list of sub-catchments (in case you
+    /// want to divide the catchment into independent hydrological units).
+    pub catchment: Vec<CalibrationCatchmentData>,
     /// The start and end date of the model run. The model can be run on a shorter time period
     /// compared to [`CalibrationInputs::time`].
     pub calibration_period: ModelPeriod,

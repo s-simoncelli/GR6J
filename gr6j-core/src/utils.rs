@@ -11,6 +11,14 @@ pub(crate) fn series_max(series: &[f64]) -> f64 {
         .expect("Cannot calculated max value")
 }
 
+/// Get the series min value
+pub(crate) fn series_min(series: &[f64]) -> f64 {
+    *series
+        .iter()
+        .min_by(|a, b| a.total_cmp(b))
+        .expect("Cannot calculated min value")
+}
+
 /// Check if a vector contains NaN and returns the indices containing invalid nu,bers.
 ///
 /// # Arguments
@@ -28,6 +36,7 @@ pub(crate) fn vector_nan_indices(data: &[f64]) -> Vec<String> {
 }
 
 /// Calculate the flow duration curve
+#[derive(Clone)]
 pub struct Fdc {
     /// The probability of exceedence (0-100)
     pub exceedence: Vec<f64>,
@@ -236,11 +245,12 @@ impl NaNVec<'_> {
             .zip(y.iter().copied())
             .filter(|(x, y)| !x.is_nan() && !y.is_nan())
             .collect();
-        Ok(combined.into_iter().map(|(a, b)| (a, b)).unzip())
+        Ok(combined.into_iter().unzip())
     }
 }
 
 /// Compare two arrays of f64
+#[allow(dead_code)]
 pub(crate) fn assert_approx_array_eq(calculated_values: &[f64], expected_values: &Vec<f64>) {
     let margins = F64Margin {
         epsilon: 2.0,

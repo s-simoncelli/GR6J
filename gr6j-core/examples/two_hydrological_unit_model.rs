@@ -1,7 +1,7 @@
 extern crate gr6j;
 
 use chrono::NaiveDate;
-use gr6j::inputs::{CatchmentData, CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit};
+use gr6j::inputs::{CatchmentData, GR6JModelInputs, ModelPeriod, RunOffUnit};
 use gr6j::model::GR6JModel;
 use gr6j::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
 use gr6j::utils::example::load_data;
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         time: &data.time,
         precipitation: &data.precipitation,
         evapotranspiration: &data.evapotranspiration,
-        catchment: CatchmentType::SubCatchments(vec![
+        catchment: vec![
             CatchmentData {
                 area: 2.0,
                 x1: X1::new(31.0)?,
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 x6: X6::new(1.3)?,
                 store_levels: None,
             },
-        ]),
+        ],
         run_period: ModelPeriod::new(start, end)?,
         warmup_period: None,
         destination: Some(Path::new(r"gr6j-core\examples\results").to_path_buf()),

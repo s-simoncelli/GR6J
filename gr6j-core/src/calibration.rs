@@ -1,11 +1,11 @@
+use crate::chart::{save_flow_comparison_chart, save_metric_vs_parameter_chart};
 use crate::error::{LoadModelError, RunModelError};
-use crate::inputs::{
-    CalibrationCatchmentData, CalibrationCatchmentType, CalibrationInputs, CatchmentData, CatchmentType,
-    GR6JModelInputs,
-};
+use crate::inputs::{CalibrationCatchmentData, CalibrationInputs, CatchmentData, GR6JModelInputs, RunOffUnit};
 use crate::metric::CalibrationMetric;
 use crate::model::GR6JModel;
-use crate::outputs::CalibrationOutputs;
+use crate::outputs::{
+    CalibrationMetricVector, CalibrationOutputs, CalibrationParameterValueVector, CalibrationParameterValues,
+};
 use crate::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
 use chrono::{Local, NaiveDate};
 use csv::Writer;
@@ -35,17 +35,21 @@ pub struct Calibration<'a> {
     run_inputs: Option<Vec<GR6JModelInputs<'a>>>,
     /// The destination where to save the charts and diagnostic data.
     destination: PathBuf,
+    /// The flow unit
+    run_off_unit: RunOffUnit,
 }
 
 /// The data collected by the parallel loop from each GR6J models.
 struct ParData {
     /// The data of all hydrological units.
-    catchment: CatchmentType,
+    catchment: Vec<CatchmentData>,
     /// The simulated run-off.
     run_off: Vec<f64>,
     /// The metrics to use to assess the model performance.
     metrics: CalibrationMetric,
 }
+
+const PARAMETER_HEADER: [&str; 7] = ["Simulation", "X1", "X2", "X3", "X4", "X5", "X6"];
 
 impl<'a> Calibration<'a> {
     /// Initialise the GR6J models to run for the calibration. This will initialise the inputs of
@@ -71,78 +75,51 @@ impl<'a> Calibration<'a> {
         let mut run_inputs: Vec<GR6JModelInputs> = vec![];
 
         // Collect the model inputs
-        match inputs.catchment {
-            CalibrationCatchmentType::OneCatchment(data) => {
-                debug!("Collecting input data for one-catchment models");
-                let all_samples = Self::sample(&data, sample_size);
+        info!("Generating {} parameter sub-samples with Latin-Hypercube", sample_size);
 
-                for sample_idx in 0..all_samples.nrows() {
-                    let sample = all_samples.slice(s![sample_idx, ..]);
-                    run_inputs.push(GR6JModelInputs {
-                        time: inputs.time,
-                        precipitation: inputs.precipitation,
-                        evapotranspiration: inputs.evapotranspiration,
-                        catchment: CatchmentType::OneCatchment(CatchmentData {
-                            area: data.area,
-                            x1: X1::new(sample[0])?,
-                            x2: X2::new(sample[1])?,
-                            x3: X3::new(sample[2])?,
-                            x4: X4::new(sample[3])?,
-                            x5: X5::new(sample[4])?,
-                            x6: X6::new(sample[5])?,
-                            store_levels: None,
-                        }),
-                        run_period: inputs.calibration_period,
-                        warmup_period: None,
-                        destination: None,
-                        observed_runoff: Some(inputs.observed_runoff),
-                        run_off_unit: inputs.run_off_unit.clone(),
-                    });
-                }
+        // Generate the samples for each sub-catchment model
+        let all_samples: Vec<Array2<f64>> = inputs
+            .catchment
+            .iter()
+            .map(|data| Self::sample(data, sample_size, None))
+            .collect();
+
+        for sample_idx in 0..all_samples[0].nrows() {
+            // Collect the data for all catchments
+            let mut catchment: Vec<CatchmentData> = vec![];
+            for (uh_idx, data) in inputs.catchment.iter().enumerate() {
+                let sample = all_samples[uh_idx].slice(s![sample_idx, ..]);
+                catchment.push(CatchmentData {
+                    area: data.area,
+                    x1: X1::new(sample[0])?,
+                    x2: X2::new(sample[1])?,
+                    x3: X3::new(sample[2])?,
+                    x4: X4::new(sample[3])?,
+                    x5: X5::new(sample[4])?,
+                    x6: X6::new(sample[5])?,
+                    store_levels: None,
+                });
             }
-            CalibrationCatchmentType::SubCatchments(data_vec) => {
-                debug!("Collecting input data for multiple-catchment models");
-                // Generate the samples
-                let all_samples: Vec<Array2<f64>> =
-                    data_vec.iter().map(|data| Self::sample(data, sample_size)).collect();
 
-                for sample_idx in 0..all_samples[0].nrows() {
-                    // Collect the data for all catchments
-                    let mut cal_data_vec: Vec<CatchmentData> = vec![];
-                    for (uh_idx, data) in data_vec.iter().enumerate() {
-                        let sample = all_samples[uh_idx].slice(s![sample_idx, ..]);
-                        cal_data_vec.push(CatchmentData {
-                            area: data.area,
-                            x1: X1::new(sample[0])?,
-                            x2: X2::new(sample[1])?,
-                            x3: X3::new(sample[2])?,
-                            x4: X4::new(sample[3])?,
-                            x5: X5::new(sample[4])?,
-                            x6: X6::new(sample[5])?,
-                            store_levels: None,
-                        });
-                    }
-
-                    // Add inputs
-                    run_inputs.push(GR6JModelInputs {
-                        time: inputs.time,
-                        precipitation: inputs.precipitation,
-                        evapotranspiration: inputs.evapotranspiration,
-                        catchment: CatchmentType::SubCatchments(cal_data_vec),
-                        run_period: inputs.calibration_period,
-                        warmup_period: None,
-                        destination: None,
-                        observed_runoff: Some(inputs.observed_runoff),
-                        run_off_unit: inputs.run_off_unit.clone(),
-                    });
-                }
-            }
-        };
+            // Add inputs
+            run_inputs.push(GR6JModelInputs {
+                time: inputs.time,
+                precipitation: inputs.precipitation,
+                evapotranspiration: inputs.evapotranspiration,
+                catchment,
+                run_period: inputs.calibration_period,
+                warmup_period: None,
+                destination: None,
+                observed_runoff: Some(inputs.observed_runoff),
+                run_off_unit: inputs.run_off_unit.clone(),
+            });
+        }
 
         info!("Created {:?} models", run_inputs.len());
 
         Ok(Self {
             run_inputs: Some(run_inputs),
+            run_off_unit: inputs.run_off_unit,
             destination,
         })
     }
@@ -154,6 +131,7 @@ impl<'a> Calibration<'a> {
     pub fn run(&mut self) -> Result<CalibrationOutputs, RunModelError> {
         let run_inputs = self.run_inputs.take().unwrap();
         let time: Vec<NaiveDate> = run_inputs[0].time.to_vec();
+        let observed = run_inputs[0].observed_runoff.unwrap();
 
         let par_data: Result<Vec<_>, _> = run_inputs
             .into_par_iter()
@@ -166,7 +144,7 @@ impl<'a> Calibration<'a> {
                     GR6JModel::new(model_inputs).map_err(|e| RunModelError::CalibrationError(model, e.to_string()))?;
                 let results = model.run()?;
                 Ok::<ParData, RunModelError>(ParData {
-                    catchment: data,
+                    catchment: data.to_vec(),
                     run_off: results.run_off,
                     metrics: results.metrics.unwrap(),
                 })
@@ -179,97 +157,111 @@ impl<'a> Calibration<'a> {
                 .map_err(|_| RunModelError::DestinationNotWritable(self.destination.to_str().unwrap().to_string()))?;
         }
 
+        let mut par_data = par_data?;
+
+        // Group the catchment data by sub-catchment
+        let first_catchment_data = par_data.first().expect("Cannot find any results").catchment.clone();
+        let total_uh = first_catchment_data.len();
+
+        let mut parameters_by_uh: Vec<CalibrationParameterValueVector> = vec![];
+        for uh_id in 0..total_uh {
+            let mut sub_uh_data: Vec<CalibrationParameterValues> = vec![];
+
+            // write header to csv writer
+            let file_name = match total_uh {
+                1 => self.destination.join("Parameters.csv"),
+                _ => self.destination.join(format!("Parameters_HU{}.csv", uh_id + 1)),
+            };
+            let mut wtr = Writer::from_path(&file_name)?;
+            wtr.write_record(PARAMETER_HEADER)?;
+            wtr.flush()?;
+
+            // collect and write CSV lines
+            for (sim_id, c) in par_data.iter().enumerate() {
+                let data: CalibrationParameterValues = c.catchment[uh_id].clone().into();
+                wtr.write_record([
+                    format!("#{}", sim_id + 1),
+                    data.x1.to_string(),
+                    data.x2.to_string(),
+                    data.x3.to_string(),
+                    data.x4.to_string(),
+                    data.x5.to_string(),
+                    data.x6.to_string(),
+                ])?;
+                wtr.flush()?;
+
+                sub_uh_data.push(data);
+            }
+            info!(
+                "Exported parameter file as '{}'",
+                file_name.to_str().unwrap().to_string()
+            );
+
+            parameters_by_uh.push(CalibrationParameterValueVector(sub_uh_data));
+        }
+
+        // Export metrics
         let metric_dest = self.destination.join("Metrics.csv");
         let metric_dest_string = metric_dest.to_str().unwrap().to_string();
         let mut metric_wtr = Writer::from_path(metric_dest)?;
 
-        let mut par_data = par_data?;
-
-        // Parameter writers
-        let parameter_header = ["Simulation", "X1", "X2", "X3", "X4", "X5", "X6"];
-        let first_catchment_data = par_data.first().expect("Cannot find any results").catchment.clone();
-        let mut param_files: Vec<String> = vec![];
-        let mut params_wtrs = match first_catchment_data {
-            CatchmentType::OneCatchment(_) => {
-                let destination = self.destination.join("Parameters.csv");
-                param_files.push(destination.to_str().unwrap().to_string());
-                let mut wtr = Writer::from_path(&destination)?;
-                wtr.write_record(parameter_header)?;
-                wtr.flush()?;
-                vec![wtr]
-            }
-            CatchmentType::SubCatchments(p) => {
-                let mut writers = vec![];
-                for ci in 0..p.len() {
-                    let destination = self.destination.join(format!("Parameters_HU{}.csv", ci + 1));
-                    param_files.push(destination.to_str().unwrap().to_string());
-                    let mut wtr = Writer::from_path(&destination)?;
-                    wtr.write_record(parameter_header)?;
-                    wtr.flush()?;
-                    writers.push(wtr);
-                }
-                writers
-            }
-        };
-
         let mut write_headers = true;
         for (sim_id, results) in par_data.iter().enumerate() {
-            // Export metrics
             let metrics = &results.metrics;
             if write_headers {
                 metrics.append_header_to_csv(&mut metric_wtr, Some("Simulation".to_string()))?;
             }
             metrics.append_row_to_csv(&mut metric_wtr, Some(format!("#{}", sim_id + 1)))?;
             write_headers = false;
+        }
+        info!("Exported metric file as '{}'", metric_dest_string);
 
-            // Export parameters
-            match &results.catchment {
-                CatchmentType::OneCatchment(data) => {
-                    let wtr = &mut params_wtrs[0];
-                    wtr.write_record([
-                        format!("#{}", sim_id),
-                        data.x1.value().to_string(),
-                        data.x2.value().to_string(),
-                        data.x3.value().to_string(),
-                        data.x4.value().to_string(),
-                        data.x5.value().to_string(),
-                        data.x6.value().to_string(),
-                    ])?;
-                    wtr.flush()?;
-                }
-                CatchmentType::SubCatchments(data) => {
-                    for (uh_id, sub_data) in data.iter().enumerate() {
-                        let wtr = &mut params_wtrs[uh_id];
-                        wtr.write_record([
-                            format!("#{}", sim_id),
-                            sub_data.x1.value().to_string(),
-                            sub_data.x2.value().to_string(),
-                            sub_data.x3.value().to_string(),
-                            sub_data.x4.value().to_string(),
-                            sub_data.x5.value().to_string(),
-                            sub_data.x6.value().to_string(),
-                        ])?;
-                        wtr.flush()?;
-                    }
-                }
+        let run_off: Vec<Vec<f64>> = par_data.iter_mut().map(|d| mem::take(d.run_off.as_mut())).collect();
+        let metrics = CalibrationMetricVector(par_data.iter_mut().map(|d| d.metrics.clone()).collect());
+
+        // Generate the parameter vs metric charts
+        for (hu_id, parameters) in parameters_by_uh.iter().enumerate() {
+            let file_prefix = match parameters_by_uh.len() {
+                1 => "".to_string(),
+                _ => format!("Sub-catchment{}_", hu_id + 1),
+            };
+            for (p_id, parameter_values) in parameters.to_vec().iter().enumerate() {
+                let dest = self
+                    .destination
+                    .join(format!("{}X{}_vs_metrics.png", file_prefix, p_id + 1));
+                let title = format!("{}Parameter X{}", file_prefix.replace('_', " / "), p_id + 1);
+                save_metric_vs_parameter_chart(parameter_values, &metrics, title, &dest).map_err(|e| {
+                    RunModelError::CannotGenerateChart(dest.to_str().unwrap().to_string(), e.to_string())
+                })?;
+                match parameters_by_uh.len() {
+                    1 => info!("Saved chart for parameter X{}", p_id + 1),
+                    _ => info!("Saved chart for sub-catchment {} - parameter X{}", hu_id + 1, p_id + 1),
+                };
             }
         }
 
-        info!("Exported metric file as '{}'", metric_dest_string);
-        for file_name in param_files.iter() {
-            info!("Exported parameter file as '{}'", file_name);
-        }
+        // Generate the comparison charts for the simulated vs. observed flow and FDC
+        (0..par_data.len()).into_par_iter().try_for_each(|model_id| {
+            info!("Generating run-off chart for model #{}", model_id + 1);
+            let dest = self.destination.join(format!("Flows_model{}.png", model_id + 1));
 
-        // TODO charts
+            save_flow_comparison_chart(
+                &time,
+                &run_off[model_id],
+                observed,
+                format!("Simulated vs. observed - Model #{}", model_id + 1),
+                &dest,
+                &self.run_off_unit,
+            )
+            .map_err(|e| RunModelError::CannotGenerateChart(dest.to_str().unwrap().to_string(), e.to_string()))?;
 
-        let run_off = par_data.iter_mut().map(|d| mem::take(d.run_off.as_mut())).collect();
-        let catchment = par_data.iter_mut().map(|d| d.catchment.clone()).collect();
-        let metrics = par_data.iter_mut().map(|d| d.metrics.clone()).collect();
+            Ok::<(), RunModelError>(())
+        })?;
 
         Ok(CalibrationOutputs {
             time,
             run_off,
-            catchment,
+            parameters: parameters_by_uh,
             metrics,
         })
     }
@@ -279,11 +271,12 @@ impl<'a> Calibration<'a> {
     /// # Arguments
     ///
     /// * `data`: The data for one catchment.
-    /// * `sample_size`: The sam[le size.
+    /// * `sample_size`: The sample size.
+    /// * `method`: The method to generate the random data.
     ///
     /// returns: `Array2<f64>`
     /// ```
-    fn sample(data: &CalibrationCatchmentData, sample_size: usize) -> Array2<f64> {
+    fn sample(data: &CalibrationCatchmentData, sample_size: usize, method: Option<LhsKind>) -> Array2<f64> {
         debug!("Generating {} samples", sample_size);
         let limits = arr2(&[
             [data.x1.lower_bound, data.x1.upper_bound],
@@ -293,6 +286,8 @@ impl<'a> Calibration<'a> {
             [data.x5.lower_bound, data.x5.upper_bound],
             [data.x6.lower_bound, data.x6.upper_bound],
         ]);
-        Lhs::new(&limits).kind(LhsKind::Optimized).sample(sample_size)
+        Lhs::new(&limits)
+            .kind(method.unwrap_or(LhsKind::Classic))
+            .sample(sample_size)
     }
 }

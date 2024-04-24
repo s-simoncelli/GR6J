@@ -6,9 +6,9 @@ use chrono::{Local, NaiveDate, TimeDelta};
 use csv::Writer;
 use log::{debug, info, warn};
 
-use crate::chart::{generate_fdc_chart, generate_summary_chart};
+use crate::chart::{generate_summary_chart, save_fdc_chart};
 use crate::error::{LoadModelError, RunModelError};
-use crate::inputs::{CatchmentType, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
+use crate::inputs::{GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
 use crate::metric::CalibrationMetric;
 use crate::outputs::{GR6JOutputs, ModelStepData, ModelStepDataVector};
 use crate::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
@@ -207,12 +207,6 @@ impl GR6JModel {
         let start_index = inputs.time.iter().position(|&r| r == inputs.run_period.start).unwrap();
         let observed = inputs.observed_runoff.map(|q| q[start_index..end_index].to_owned());
 
-        // Convert data for one catchment
-        let catchments_data = match inputs.catchment {
-            CatchmentType::OneCatchment(data) => vec![data],
-            CatchmentType::SubCatchments(data_vec) => data_vec,
-        };
-
         // check the input data
         let i = vector_nan_indices(precipitation.as_slice());
         if !i.is_empty() {
@@ -230,7 +224,7 @@ impl GR6JModel {
         }
 
         let mut models: Vec<ModelData> = vec![];
-        for catchment_data in catchments_data.iter() {
+        for catchment_data in inputs.catchment.to_vec().iter() {
             // initialise the reservoir levels
             let mut int_store_levels = catchment_data.store_levels.unwrap_or_default();
 
@@ -400,7 +394,7 @@ impl GR6JModel {
                 .map_err(|e| RunModelError::CannotGenerateChart("summary".to_string(), e.to_string()))?;
 
             let obs_fdc = self.observed.as_ref().map(|q| Fdc::new(q));
-            generate_fdc_chart(self, sim_fdc, obs_fdc, destination)
+            save_fdc_chart(self, sim_fdc, obs_fdc, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("fdc".to_string(), e.to_string()))?;
             debug!("Exported flow duration curve chart");
 
@@ -666,13 +660,13 @@ mod tests {
     use std::str::FromStr;
 
     use crate::inputs::{CatchmentData, RunOffUnit, StoreLevels};
-    use crate::model::{CatchmentType, GR6JModel, GR6JModelInputs, ModelPeriod, Parameter};
+    use crate::model::{GR6JModel, GR6JModelInputs, ModelPeriod, Parameter};
     use crate::outputs::{ModelStepData, ModelStepDataVector};
     use crate::parameter::{X1, X2, X3, X4, X5, X6};
     use crate::utils::assert_approx_array_eq;
 
-    fn default_catchment_data() -> CatchmentData {
-        CatchmentData {
+    fn default_catchment_data() -> Vec<CatchmentData> {
+        vec![CatchmentData {
             area: 1.0,
             x1: X1::new(0.01).unwrap(),
             x2: X2::new(0.0).unwrap(),
@@ -681,7 +675,7 @@ mod tests {
             x5: X5::new(0.0).unwrap(),
             x6: X6::new(0.4).unwrap(),
             store_levels: None,
-        }
+        }]
     }
 
     /// Parse the result file for a GR6J run from R
@@ -797,7 +791,7 @@ mod tests {
             time: &time,
             precipitation: &precipitation,
             evapotranspiration: &evapotranspiration,
-            catchment: CatchmentType::OneCatchment(catchment_data),
+            catchment: vec![catchment_data],
             run_period: ModelPeriod::new(start, end).unwrap(),
             warmup_period: None,
             destination: None,
@@ -842,7 +836,7 @@ mod tests {
             time: &t,
             precipitation: &precipitation,
             evapotranspiration: &evapotranspiration,
-            catchment: CatchmentType::OneCatchment(default_catchment_data()),
+            catchment: default_catchment_data(),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -866,7 +860,7 @@ mod tests {
             time: &t,
             precipitation: &precipitation,
             evapotranspiration: &evapotranspiration,
-            catchment: CatchmentType::OneCatchment(default_catchment_data()),
+            catchment: default_catchment_data(),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -890,7 +884,7 @@ mod tests {
             time: &t,
             precipitation: &precipitation,
             evapotranspiration: &evapotranspiration,
-            catchment: CatchmentType::OneCatchment(default_catchment_data()),
+            catchment: default_catchment_data(),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -913,7 +907,7 @@ mod tests {
             time: &t,
             precipitation: &precipitation,
             evapotranspiration: &evapotranspiration,
-            catchment: CatchmentType::OneCatchment(default_catchment_data()),
+            catchment: default_catchment_data(),
             run_period: ModelPeriod::new(NaiveDate::from_ymd_opt(1999, 1, 1).unwrap(), t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -942,7 +936,7 @@ mod tests {
             time: &t,
             precipitation: &precipitation,
             evapotranspiration: &evapotranspiration,
-            catchment: CatchmentType::OneCatchment(default_catchment_data()),
+            catchment: default_catchment_data(),
             run_period: ModelPeriod::new(t[0], t[365]).unwrap(),
             warmup_period: None,
             destination: None,
@@ -1073,7 +1067,7 @@ mod tests {
             time: &time,
             precipitation: &precipitation,
             evapotranspiration: &evapotranspiration,
-            catchment: CatchmentType::SubCatchments(vec![hu1, hu2]),
+            catchment: vec![hu1, hu2],
             run_period: ModelPeriod::new(start, end).unwrap(),
             warmup_period: None,
             destination: None,

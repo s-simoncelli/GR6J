@@ -1,6 +1,6 @@
 pub mod calibration;
-pub mod chart;
-pub mod error;
+mod chart;
+mod error;
 pub mod inputs;
 pub mod metric;
 pub mod model;

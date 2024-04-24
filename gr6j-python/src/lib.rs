@@ -1,7 +1,7 @@
 use ::gr6j::error::ModelPeriodError;
 use ::gr6j::inputs::{
-    CatchmentData as RsCatchmentData, CatchmentType as RsCatchmentType, GR6JModelInputs as RsGR6JModelInputs,
-    ModelPeriod as RsModelPeriod, RunOffUnit as RsRunOffUnit, StoreLevels as RsStorelevels,
+    CatchmentData as RsCatchmentData, GR6JModelInputs as RsGR6JModelInputs, ModelPeriod as RsModelPeriod,
+    RunOffUnit as RsRunOffUnit, StoreLevels as RsStoreLevels,
 };
 use ::gr6j::metric::{CalibrationMetric as RsCalibrationMetric, Metric as RsMetric};
 use ::gr6j::model::GR6JModel as RsGR6JModel;
@@ -23,9 +23,9 @@ struct StoreLevels {
     exponential_store: f64,
 }
 
-impl From<StoreLevels> for RsStorelevels {
-    fn from(s: StoreLevels) -> RsStorelevels {
-        RsStorelevels {
+impl From<StoreLevels> for RsStoreLevels {
+    fn from(s: StoreLevels) -> RsStoreLevels {
+        RsStoreLevels {
             production_store: s.production_store,
             routing_store: s.routing_store,
             exponential_store: s.exponential_store,
@@ -194,26 +194,9 @@ impl From<RunOffUnit> for RsRunOffUnit {
 
 #[pyclass]
 #[derive(Clone)]
-struct CatchmentType {
-    one_catchment: Option<CatchmentData>,
-    more_catchments: Option<Vec<CatchmentData>>,
-}
+struct CatchmentDataVec(Vec<CatchmentData>);
 
-impl TryFrom<CatchmentType> for RsCatchmentType {
-    type Error = String;
-
-    fn try_from(s: CatchmentType) -> Result<Self, Self::Error> {
-        if let Some(c) = s.more_catchments {
-            let uh_data: Result<Vec<_>, _> = c.into_iter().map(|data| data.try_into()).collect();
-            Ok(RsCatchmentType::SubCatchments(uh_data?))
-        } else {
-            let data = s.one_catchment.expect("Missing CatchmentData");
-            Ok(RsCatchmentType::OneCatchment(data.try_into()?))
-        }
-    }
-}
-
-impl TryFrom<PyObject> for CatchmentType {
+impl TryFrom<PyObject> for CatchmentDataVec {
     type Error = PyErr;
     fn try_from(value: PyObject) -> Result<Self, Self::Error> {
         // Convert the catchment data
@@ -227,10 +210,7 @@ impl TryFrom<PyObject> for CatchmentType {
             let is_list: bool = isinstance.call1((&value, PyList::type_object_bound(py)))?.extract()?;
 
             if is_one {
-                return Ok::<CatchmentType, PyErr>(CatchmentType {
-                    one_catchment: Some(value.extract::<CatchmentData>(py)?),
-                    more_catchments: None,
-                });
+                return Ok(CatchmentDataVec(vec![value.extract::<CatchmentData>(py)?]));
             } else if is_list {
                 // The list must contain instances of CatchmentData
                 let res: Vec<PyObject> = value.extract(py)?;
@@ -244,10 +224,7 @@ impl TryFrom<PyObject> for CatchmentType {
                         ));
                     }
                 }
-                return Ok::<CatchmentType, PyErr>(CatchmentType {
-                    one_catchment: None,
-                    more_catchments: Some(value.extract::<Vec<CatchmentData>>(py)?),
-                });
+                return Ok(CatchmentDataVec(value.extract::<Vec<CatchmentData>>(py)?));
             }
             Err(PyValueError::new_err(
                 "The catchment argument must be an instance of one CatchmentData or a list of CatchmentData classes",
@@ -257,21 +234,21 @@ impl TryFrom<PyObject> for CatchmentType {
 }
 
 #[pymethods]
-impl CatchmentType {
+impl CatchmentDataVec {
     fn __repr__(&self) -> PyResult<String> {
-        if let Some(c) = &self.one_catchment {
-            return Ok(c.__repr__().unwrap());
-        } else if let Some(c) = &self.more_catchments {
-            let mut str: String = "[".to_string();
-            for data in c.iter() {
-                str += &data.__repr__().unwrap();
-                str += ",";
+        match self.0.len() {
+            1 => Ok(self.0[0].__repr__().unwrap()),
+            _ => {
+                let mut str: String = "[".to_string();
+                for data in self.0.iter() {
+                    str += &data.__repr__().unwrap();
+                    str += ",";
+                }
+                str.pop();
+                str += "]";
+                Ok(str)
             }
-            str.pop();
-            str += "]";
-            return Ok(str);
         }
-        Err(PyValueError::new_err("Cannot find any catchment data"))
     }
 
     fn __str__(&self) -> String {
@@ -290,7 +267,7 @@ struct GR6JModelInputs {
     evapotranspiration: Vec<f64>,
     #[pyo3(get)]
     catchment: PyObject, // keep this to allow user access
-    rs_catchment: CatchmentType,
+    rs_catchment: CatchmentDataVec,
     #[pyo3(get)]
     run_period: ModelPeriod,
     #[pyo3(get)]
@@ -319,13 +296,13 @@ impl GR6JModelInputs {
         observed_runoff: Option<Vec<f64>>,
         run_off_unit: Option<RunOffUnit>,
     ) -> PyResult<Self> {
-        let cat_data = catchment.clone();
+        let catch_data = catchment.clone();
         Ok(GR6JModelInputs {
             time,
             precipitation,
             evapotranspiration,
             catchment,
-            rs_catchment: CatchmentType::try_from(cat_data)?,
+            rs_catchment: CatchmentDataVec::try_from(catch_data)?.0,
             run_period,
             warmup_period,
             destination,
