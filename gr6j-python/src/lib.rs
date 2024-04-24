@@ -1,11 +1,12 @@
 use ::gr6j::error::ModelPeriodError;
 use ::gr6j::inputs::{
-    CatchmentData as RsCatchmentData, CatchmentType as RsCatchmentType, GR6JModelInputs as RsGR6JModelInputs,
-    ModelPeriod as RsModelPeriod, RunOffUnit as RsRunOffUnit, StoreLevels as RsStorelevels,
+    CatchmentData as RsCatchmentData, GR6JModelInputs as RsGR6JModelInputs, ModelPeriod as RsModelPeriod,
+    RunOffUnit as RsRunOffUnit, StoreLevels as RsStoreLevels,
 };
+use ::gr6j::metric::{CalibrationMetric as RsCalibrationMetric, Metric as RsMetric};
 use ::gr6j::model::GR6JModel as RsGR6JModel;
 use ::gr6j::outputs::ModelStepData as RsModelStepData;
-use ::gr6j::parameter::Parameter;
+use ::gr6j::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
 use chrono::NaiveDate;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -22,9 +23,9 @@ struct StoreLevels {
     exponential_store: f64,
 }
 
-impl From<StoreLevels> for RsStorelevels {
-    fn from(s: StoreLevels) -> RsStorelevels {
-        RsStorelevels {
+impl From<StoreLevels> for RsStoreLevels {
+    fn from(s: StoreLevels) -> RsStoreLevels {
+        RsStoreLevels {
             production_store: s.production_store,
             routing_store: s.routing_store,
             exponential_store: s.exponential_store,
@@ -56,7 +57,7 @@ impl StoreLevels {
 }
 
 #[pyclass(get_all)]
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct CatchmentData {
     area: f64,
     x1: f64,
@@ -68,18 +69,19 @@ struct CatchmentData {
     store_levels: Option<StoreLevels>,
 }
 
-impl From<CatchmentData> for RsCatchmentData {
-    fn from(s: CatchmentData) -> RsCatchmentData {
-        RsCatchmentData {
+impl TryFrom<CatchmentData> for RsCatchmentData {
+    type Error = String;
+    fn try_from(s: CatchmentData) -> Result<Self, Self::Error> {
+        Ok(RsCatchmentData {
             area: s.area,
-            x1: Parameter::X1(s.x1),
-            x2: Parameter::X2(s.x2),
-            x3: Parameter::X3(s.x3),
-            x4: Parameter::X4(s.x4),
-            x5: Parameter::X5(s.x5),
-            x6: Parameter::X6(s.x6),
+            x1: X1::new(s.x1)?,
+            x2: X2::new(s.x2)?,
+            x3: X3::new(s.x3)?,
+            x4: X4::new(s.x4)?,
+            x5: X5::new(s.x5)?,
+            x6: X6::new(s.x6)?,
             store_levels: s.store_levels.map(|l| l.into()),
-        }
+        })
     }
 }
 
@@ -96,8 +98,8 @@ impl CatchmentData {
         x5: f64,
         x6: f64,
         store_levels: Option<StoreLevels>,
-    ) -> CatchmentData {
-        CatchmentData {
+    ) -> PyResult<CatchmentData> {
+        let data = CatchmentData {
             area,
             x1,
             x2,
@@ -106,7 +108,11 @@ impl CatchmentData {
             x5,
             x6,
             store_levels,
-        }
+        };
+        // throw exceptions
+        RsCatchmentData::try_from(data).map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        Ok(data)
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -127,7 +133,7 @@ impl CatchmentData {
 }
 
 #[pyclass(get_all)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct ModelPeriod {
     start: NaiveDate,
     end: NaiveDate,
@@ -143,8 +149,13 @@ impl TryFrom<ModelPeriod> for RsModelPeriod {
 #[pymethods]
 impl ModelPeriod {
     #[new]
-    fn new(start: NaiveDate, end: NaiveDate) -> Self {
-        ModelPeriod { start, end }
+    fn new(start: NaiveDate, end: NaiveDate) -> PyResult<Self> {
+        let period = ModelPeriod { start, end };
+
+        // throw exceptions
+        RsModelPeriod::try_from(period).map_err(|e| PyValueError::new_err(e.to_string()))?;
+
+        Ok(period)
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -183,23 +194,9 @@ impl From<RunOffUnit> for RsRunOffUnit {
 
 #[pyclass]
 #[derive(Clone)]
-struct CatchmentType {
-    one_catchment: Option<CatchmentData>,
-    more_catchments: Option<Vec<CatchmentData>>,
-}
+struct CatchmentDataVec(Vec<CatchmentData>);
 
-impl From<CatchmentType> for RsCatchmentType {
-    fn from(s: CatchmentType) -> RsCatchmentType {
-        if let Some(c) = s.more_catchments {
-            RsCatchmentType::SubCatchments(c.into_iter().map(Into::<RsCatchmentData>::into).collect())
-        } else {
-            let data = s.one_catchment.expect("Missing CatchmentData");
-            RsCatchmentType::OneCatchment(Into::<RsCatchmentData>::into(data))
-        }
-    }
-}
-
-impl TryFrom<PyObject> for CatchmentType {
+impl TryFrom<PyObject> for CatchmentDataVec {
     type Error = PyErr;
     fn try_from(value: PyObject) -> Result<Self, Self::Error> {
         // Convert the catchment data
@@ -213,10 +210,7 @@ impl TryFrom<PyObject> for CatchmentType {
             let is_list: bool = isinstance.call1((&value, PyList::type_object_bound(py)))?.extract()?;
 
             if is_one {
-                return Ok::<CatchmentType, PyErr>(CatchmentType {
-                    one_catchment: Some(value.extract::<CatchmentData>(py)?),
-                    more_catchments: None,
-                });
+                return Ok(CatchmentDataVec(vec![value.extract::<CatchmentData>(py)?]));
             } else if is_list {
                 // The list must contain instances of CatchmentData
                 let res: Vec<PyObject> = value.extract(py)?;
@@ -230,10 +224,7 @@ impl TryFrom<PyObject> for CatchmentType {
                         ));
                     }
                 }
-                return Ok::<CatchmentType, PyErr>(CatchmentType {
-                    one_catchment: None,
-                    more_catchments: Some(value.extract::<Vec<CatchmentData>>(py)?),
-                });
+                return Ok(CatchmentDataVec(value.extract::<Vec<CatchmentData>>(py)?));
             }
             Err(PyValueError::new_err(
                 "The catchment argument must be an instance of one CatchmentData or a list of CatchmentData classes",
@@ -243,21 +234,21 @@ impl TryFrom<PyObject> for CatchmentType {
 }
 
 #[pymethods]
-impl CatchmentType {
+impl CatchmentDataVec {
     fn __repr__(&self) -> PyResult<String> {
-        if let Some(c) = &self.one_catchment {
-            return Ok(c.__repr__().unwrap());
-        } else if let Some(c) = &self.more_catchments {
-            let mut str: String = "[".to_string();
-            for data in c.iter() {
-                str += &data.__repr__().unwrap();
-                str += ",";
+        match self.0.len() {
+            1 => Ok(self.0[0].__repr__().unwrap()),
+            _ => {
+                let mut str: String = "[".to_string();
+                for data in self.0.iter() {
+                    str += &data.__repr__().unwrap();
+                    str += ",";
+                }
+                str.pop();
+                str += "]";
+                Ok(str)
             }
-            str.pop();
-            str += "]";
-            return Ok(str);
         }
-        Err(PyValueError::new_err("Cannot find any catchment data"))
     }
 
     fn __str__(&self) -> String {
@@ -276,7 +267,7 @@ struct GR6JModelInputs {
     evapotranspiration: Vec<f64>,
     #[pyo3(get)]
     catchment: PyObject, // keep this to allow user access
-    rs_catchment: CatchmentType,
+    rs_catchment: CatchmentDataVec,
     #[pyo3(get)]
     run_period: ModelPeriod,
     #[pyo3(get)]
@@ -305,13 +296,13 @@ impl GR6JModelInputs {
         observed_runoff: Option<Vec<f64>>,
         run_off_unit: Option<RunOffUnit>,
     ) -> PyResult<Self> {
-        let cat_data = catchment.clone();
+        let catch_data = catchment.clone();
         Ok(GR6JModelInputs {
             time,
             precipitation,
             evapotranspiration,
             catchment,
-            rs_catchment: CatchmentType::try_from(cat_data)?,
+            rs_catchment: CatchmentDataVec::try_from(catch_data)?.0,
             run_period,
             warmup_period,
             destination,
@@ -379,6 +370,66 @@ impl ModelStepData {
     }
 }
 
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct Metric {
+    name: String,
+    ideal_value: f64,
+    value: f64,
+}
+
+impl Metric {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!("Metric(name={},value={})", self.name, self.value))
+    }
+
+    fn __str__(&self) -> String {
+        self.__repr__().unwrap()
+    }
+}
+
+impl From<RsMetric> for Metric {
+    fn from(m: RsMetric) -> Self {
+        Self {
+            name: m.name,
+            ideal_value: m.ideal_value,
+            value: m.value,
+        }
+    }
+}
+
+#[pyclass(get_all)]
+#[derive(Clone)]
+pub struct CalibrationMetric {
+    nash_sutcliffe: Metric,
+    log_nash_sutcliffe: Metric,
+    kling_gupta2009: Metric,
+    kling_gupta2012: Metric,
+    non_paramettric_kling_gupta: Metric,
+}
+
+impl From<RsCalibrationMetric> for CalibrationMetric {
+    fn from(m: RsCalibrationMetric) -> Self {
+        Self {
+            nash_sutcliffe: m.nash_sutcliffe.into(),
+            log_nash_sutcliffe: m.log_nash_sutcliffe.into(),
+            kling_gupta2009: m.kling_gupta2009.into(),
+            kling_gupta2012: m.kling_gupta2012.into(),
+            non_paramettric_kling_gupta: m.non_parametric_kling_gupta.into(),
+        }
+    }
+}
+
+impl CalibrationMetric {
+    fn __repr__(&self) -> PyResult<String> {
+        Ok("CalibrationMetric()".to_string())
+    }
+
+    fn __str__(&self) -> String {
+        self.__repr__().unwrap()
+    }
+}
+
 impl From<RsModelStepData> for ModelStepData {
     fn from(value: RsModelStepData) -> Self {
         ModelStepData {
@@ -412,6 +463,7 @@ struct GR6JOutputs {
     catchment_outputs: Vec<Vec<ModelStepData>>,
     time: Vec<NaiveDate>,
     run_off: Vec<f64>,
+    metrics: CalibrationMetric,
 }
 
 impl GR6JOutputs {
@@ -453,15 +505,19 @@ impl GR6JModel {
             ),
         };
 
+        let catchment = inputs
+            .rs_catchment
+            .try_into()
+            .map_err(|e: String| PyValueError::new_err(e))?;
         let inputs = RsGR6JModelInputs {
-            time: inputs.time,
-            precipitation: inputs.precipitation,
-            evapotranspiration: inputs.evapotranspiration,
-            catchment: inputs.rs_catchment.into(),
+            time: &inputs.time,
+            precipitation: &inputs.precipitation,
+            evapotranspiration: &inputs.evapotranspiration,
+            catchment,
             run_period,
             warmup_period,
             destination: inputs.destination,
-            observed_runoff: inputs.observed_runoff,
+            observed_runoff: inputs.observed_runoff.as_ref().into(),
             run_off_unit: inputs.run_off_unit.unwrap_or_default().into(),
         };
         let model = GR6JModel {
@@ -504,6 +560,7 @@ impl GR6JModel {
             catchment_outputs: model_results,
             time: results.time,
             run_off: results.run_off,
+            metrics: results.metrics.into(),
         })
     }
 }
@@ -512,6 +569,8 @@ impl GR6JModel {
 fn gr6j(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<StoreLevels>()?;
     m.add_class::<CatchmentData>()?;
+    m.add_class::<Metric>()?;
+    m.add_class::<CalibrationMetric>()?;
     m.add_class::<ModelPeriod>()?;
     m.add_class::<RunOffUnit>()?;
     m.add_class::<GR6JModelInputs>()?;

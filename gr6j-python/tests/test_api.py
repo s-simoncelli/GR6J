@@ -15,8 +15,8 @@ def test_simple_model():
     )
 
     # Configure the model
-    start = date(1994, 1, 1)
-    end = date(1998, 12, 31)
+    start = date(1990, 1, 1)
+    end = date(1994, 12, 31)
 
     inputs = GR6JModelInputs(
         time=data.index.tolist(),
@@ -51,7 +51,11 @@ def test_destination_exception():
         GR6JModel(inputs)
 
 
-@pytest.skip(reason="Not working yet")
+def test_parameter_exception():
+    with pytest.raises(ValueError):
+        CatchmentData(area=1.0, x1=0.0, x2=3.47, x3=32, x4=2.1, x5=0.55, x6=5.3)
+
+
 def test_model_period_exception():
     with pytest.raises(ValueError):
         ModelPeriod(start=date(1999, 12, 1), end=date(1999, 1, 1))

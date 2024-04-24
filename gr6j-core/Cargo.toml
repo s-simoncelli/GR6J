@@ -17,3 +17,5 @@ csv = { workspace = true }
 ndarray = { workspace = true }
 ordered-float = { workspace = true }
 float-cmp = { workspace = true }
+egobox-doe = "0.18.1"
+rayon = "1.10.0"

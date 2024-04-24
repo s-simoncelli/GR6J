@@ -212,6 +212,39 @@ class GR6JModelInputs:
         Default to None.
         """
 
+class Metric:
+    name: str
+    """ The metric name """
+    ideal_value: float
+    """ The metric ideal value. """
+    value: float
+    """ The metric value from the difference between the observed and simulated data. """
+
+class CalibrationMetric:
+    nash_sutcliffe: Metric
+    """ The Nash-Sutcliffe efficiency. An efficiency of 1 gives a perfect match of 
+     simulated to observed data. An efficiency of 0 indicates that the model predictions 
+     are as accurate as the mean of the observations, whereas an efficiency less than 
+     zero occurs when the observed mean is a better predictor than the model.   """
+    log_nash_sutcliffe: Metric
+    """ The Nash-Sutcliffe efficiency but the logarithm is applied to flow data to give 
+     more importance to low flow periods. An efficiency of 1 gives a perfect match of 
+     simulated to observed data. """
+    kling_gupta2009: Metric
+    """ The 2009 Kling-Gupta efficiency metric. An efficiency of 1 gives a perfect match
+     of simulated to observed data. To calculate the alpha component the standard 
+     deviation is used. """
+    kling_gupta2012: Metric
+    """  The 2012 Kling-Gupta efficiency metric. An efficiency of 1 gives a perfect match
+     of simulated to observed data. To calculate the alpha component the ratio of the 
+     standard deviation and the mean is used. """
+    non_paramettric_kling_gupta: Metric
+    """  The non-parametric Kling-Gupta efficiency metric. An efficiency of 1 gives a 
+     perfect match of simulated to observed data. This differs from kling_gupta2012 and
+     kling_gupta2012 because the alpha component is calculated using the flow percentile
+     from the flow duration curve instead of using the standard deviation.
+     See <https://www.tandfonline.com/doi/full/10.1080/02626667.2018.1552002> """
+
 class ModelStepData:
     time: date
     """ The time """

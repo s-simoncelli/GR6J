@@ -1,5 +1,7 @@
+use csv::Writer;
 use float_cmp::{approx_eq, F64Margin};
 use ndarray::Array;
+use std::path::PathBuf;
 
 /// Get the series max value
 pub(crate) fn series_max(series: &[f64]) -> f64 {
@@ -9,18 +11,75 @@ pub(crate) fn series_max(series: &[f64]) -> f64 {
         .expect("Cannot calculated max value")
 }
 
-/// Calculate the flow duration curve.
+/// Get the series min value
+pub(crate) fn series_min(series: &[f64]) -> f64 {
+    *series
+        .iter()
+        .min_by(|a, b| a.total_cmp(b))
+        .expect("Cannot calculated min value")
+}
+
+/// Check if a vector contains NaN and returns the indices containing invalid nu,bers.
 ///
 /// # Arguments
 ///
-/// * `run_off`: The run-off data.
+/// * `data`: The vector to check.
 ///
-/// returns: (`Vec<f64>`,` Vec<f64>`) The probability of exceedence (0-190) and the sorted run-off data.
-pub fn calculate_fdc(run_off: &[f64]) -> (Vec<f64>, Vec<f64>) {
-    let exceedence = Array::range(1., run_off.len() as f64 + 1.0, 1.0) / run_off.len() as f64 * 100.0;
+/// returns: Vec<String>
+pub(crate) fn vector_nan_indices(data: &[f64]) -> Vec<String> {
+    return data
+        .iter()
+        .enumerate()
+        .filter(|(_, &r)| r.is_nan())
+        .map(|(index, _)| index.to_string())
+        .collect::<Vec<_>>();
+}
 
-    let sorted_run_off = NaNVec(run_off).sort(SortType::Asc);
-    (exceedence.to_vec(), sorted_run_off.to_vec())
+/// Calculate the flow duration curve
+#[derive(Clone)]
+pub struct Fdc {
+    /// The probability of exceedence (0-100)
+    pub exceedence: Vec<f64>,
+    /// The sorted run-off data to plot against the probability.
+    pub sorted_run_off: Vec<f64>,
+}
+
+impl Fdc {
+    /// Calculate the flow duration curve.
+    ///
+    /// # Arguments
+    ///
+    /// * `run_off`: The run-off time series.
+    ///
+    /// returns: Fdc
+    pub fn new(run_off: &[f64]) -> Self {
+        let exceedence = Array::range(1., run_off.len() as f64 + 1.0, 1.0) / run_off.len() as f64 * 100.0;
+        let sorted_run_off = NaNVec(run_off).sort(SortType::Asc);
+
+        Self {
+            exceedence: exceedence.to_vec(),
+            sorted_run_off: sorted_run_off.to_vec(),
+        }
+    }
+
+    /// Export theflow duration curve and to a CSV file.
+    ///
+    /// # Arguments
+    ///
+    /// * `destination`: The destination CSV file.
+    /// * `run_off_unit`: The run-off unit of measurement.
+    ///
+    /// returns: Result<(), csv::Error>
+    pub fn to_csv(&self, destination: &PathBuf, run_off_unit: &str) -> Result<(), csv::Error> {
+        let mut wtr = Writer::from_path(destination)?;
+        wtr.write_record(["Percentage exceedance", format!("Run-off ({})", run_off_unit).as_str()])?;
+
+        for (pct, q) in self.exceedence.iter().zip(&self.sorted_run_off) {
+            wtr.write_record([pct.to_string(), q.to_string()])?;
+            wtr.flush()?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(PartialEq)]
@@ -87,7 +146,7 @@ impl NaNVec<'_> {
     ///
     /// * `vec`: The vector to reduce.
     ///
-    /// returns: Vec<f64>
+    /// returns: `Vec<f64>`
     pub fn remove_nans(&self) -> Vec<f64> {
         self.0.iter().copied().filter(|x| !x.is_nan()).collect()
     }
@@ -173,7 +232,7 @@ impl NaNVec<'_> {
     ///
     /// * `y`: The second vector.
     ///
-    /// returns: Result<(Vec<f64>, Vec<f64>), &str>
+    /// returns: Result<(`Vec<f64>`, `Vec<f64>`), &str>
     pub fn remove_nans_from_pair<'a>(&self, y: &[f64]) -> Result<(Vec<f64>, Vec<f64>), &'a str> {
         if self.0.len() != y.len() {
             return Err("The vector must have the same length");
@@ -186,11 +245,12 @@ impl NaNVec<'_> {
             .zip(y.iter().copied())
             .filter(|(x, y)| !x.is_nan() && !y.is_nan())
             .collect();
-        Ok(combined.into_iter().map(|(a, b)| (a, b)).unzip())
+        Ok(combined.into_iter().unzip())
     }
 }
 
 /// Compare two arrays of f64
+#[allow(dead_code)]
 pub(crate) fn assert_approx_array_eq(calculated_values: &[f64], expected_values: &Vec<f64>) {
     let margins = F64Margin {
         epsilon: 2.0,
@@ -204,6 +264,55 @@ pub(crate) fn assert_approx_array_eq(calculated_values: &[f64], expected_values:
                     expected: `{expected:?}`"#,
             )
         }
+    }
+}
+
+pub mod example {
+    use chrono::NaiveDate;
+    use std::error::Error;
+    use std::fs::File;
+    use std::path::PathBuf;
+
+    pub struct HydrologicalData {
+        /// Vector of time.
+        pub time: Vec<NaiveDate>,
+        /// Input vector of total precipitation (mm/day).
+        pub precipitation: Vec<f64>,
+        /// Input vector of potential evapotranspiration (PE) (mm/day).
+        pub evapotranspiration: Vec<f64>,
+        /// Observed run-off (mm/day).
+        pub observed_runoff: Vec<f64>,
+    }
+
+    pub fn load_data() -> Result<HydrologicalData, Box<dyn Error>> {
+        let mut data_folder = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        data_folder.push(r"src\test_data\airGR_L0123001_dataset.csv");
+
+        // Collect hydrological data
+        let file = File::open(r"gr6j-core\src\test_data\airGR_L0123001_dataset.csv")?;
+        let mut rdr = csv::Reader::from_reader(file);
+
+        let mut time: Vec<NaiveDate> = vec![];
+        let mut precipitation: Vec<f64> = vec![];
+        let mut evapotranspiration: Vec<f64> = vec![];
+        let mut observed_runoff: Vec<f64> = vec![];
+        for result in rdr.records() {
+            let record = result.unwrap();
+            let t = NaiveDate::parse_from_str(record.get(0).unwrap(), "%d/%m/%Y")?;
+            time.push(t);
+            precipitation.push(record.get(1).unwrap().parse::<f64>()?);
+            evapotranspiration.push(record.get(2).unwrap().parse::<f64>()?);
+            let obs = record.get(3).unwrap();
+            let obs = if obs == "NA" { "0.0" } else { obs };
+            observed_runoff.push(obs.parse::<f64>()?);
+        }
+
+        Ok(HydrologicalData {
+            time,
+            precipitation,
+            evapotranspiration,
+            observed_runoff,
+        })
     }
 }
 

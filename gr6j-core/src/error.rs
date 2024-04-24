@@ -1,4 +1,6 @@
 use chrono::NaiveDate;
+use csv::Error;
+use std::io;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -9,6 +11,16 @@ pub enum ModelPeriodError {
 
 #[derive(Error, Debug)]
 pub enum LoadModelError {
+    #[error("The {0} must be larger than its minimum threshold ({1})")]
+    ParameterTooSmall(String, f64),
+    #[error("The {0} must be smaller than its maximum threshold ({1})")]
+    ParameterTooLarge(String, f64),
+    #[error("The lower bound ({0}) for '{1}' must be larger than its upper bound ({2})")]
+    ParameterBounds(f64, String, f64),
+    #[error("The lower bound ({0}) for '{1}' must be larger than the parameter minimum threshold ({2})")]
+    ParameterTooSmallLowerBound(f64, String, f64),
+    #[error("The upper bound ({0}) for '{1}' must be smaller than the parameter maximum threshold ({2})")]
+    ParameterTooLargeUpperBound(f64, String, f64),
     #[error("The time and {0} vectors must have the same length")]
     MismatchedLength(String),
     #[error("{0}")]
@@ -23,8 +35,10 @@ pub enum LoadModelError {
     TooFarWarmUpPeriod(String, String),
     #[error("The destination folder {0} does not exist")]
     DestinationNotFound(String),
-    #[error("The {0} series contains at least one NA value. Missing values are not allowed")]
-    NanData(String),
+    #[error(
+        "The {0} series contains at least one NA value at the following indices: {1:?}. Missing values are not allowed"
+    )]
+    NanData(String, Vec<String>),
     #[error("{0}")]
     Generic(String),
 }
@@ -37,16 +51,24 @@ pub enum RunModelError {
     WrongConversion(),
     #[error("The simulation end date was reached and the model cannot advanced anymore")]
     ReachedSimulationEnd(),
-    #[error("The CSV file '{0}' cannot be exported because {1}")]
-    CannotExportCsv(String, String),
+    #[error("The simulation metrics cannot be calculated because {0}")]
+    CannotCalculateMetrics(String),
+    #[error("A CSV file cannot be exported because {0}")]
+    CannotExportCsv(String),
     #[error("The {0} chart file cannot be generated because {1}")]
     CannotGenerateChart(String, String),
+    #[error("Cannot load the calibration model #{0} because: {1}")]
+    CalibrationError(usize, String),
 }
 
-#[derive(Error, Debug)]
-pub enum FdcError {
-    #[error("The max percentile must be less or equal to 100")]
-    PercentileTooLarge(),
-    #[error("The min percentile must be larger or equal to 0")]
-    PercentileTooSmall(),
+impl From<csv::Error> for RunModelError {
+    fn from(value: Error) -> Self {
+        RunModelError::CannotExportCsv(value.to_string())
+    }
+}
+
+impl From<io::Error> for RunModelError {
+    fn from(value: io::Error) -> Self {
+        RunModelError::CannotExportCsv(value.to_string())
+    }
 }
