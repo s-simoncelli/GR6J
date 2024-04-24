@@ -182,11 +182,15 @@ pub struct CalibrationInputs<'a> {
     /// the best calibration parameters and (4) a CSV file with metric values. The files are
     /// exported to a sub-folder named with the run timestamp.
     pub destination: PathBuf,
+    /// Convert the simulated run-off to the desired unit of measurement, so that it matches the
+    /// unit of the observed run-off.
+    pub run_off_unit: RunOffUnit,
     /// Generate the provided number of samples. Each sample contains a random combination of the
     /// model parameters based on the ranges given in [`CalibrationCatchmentData`]. Default to `200`
     /// when `None`.
     pub sample_size: Option<usize>,
-    /// Convert the simulated run-off to the desired unit of measurement, so that it matches the
-    /// unit of the observed run-off.
-    pub run_off_unit: RunOffUnit,
+    /// Whether to export the comparison of the observed and simulated run-off time series and
+    /// flow duration curves for each model. If `true`, the tool will generate as many as
+    /// [`CalibrationInputs::sample_size`] figures.
+    pub generate_comparison_charts: bool,
 }

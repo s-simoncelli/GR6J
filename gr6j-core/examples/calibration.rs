@@ -13,12 +13,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_module("gr6j::model", LevelFilter::Off)
         .init();
 
-    // Collect hydrological data.
+    // Collect the hydrological data
     let data = load_data()?;
 
     // Configure the model
-    let start = NaiveDate::from_ymd_opt(1984, 1, 1).unwrap();
-    let end = NaiveDate::from_ymd_opt(1994, 12, 31).unwrap();
+    let start = NaiveDate::from_ymd_opt(1986, 1, 1).unwrap();
+    let end = NaiveDate::from_ymd_opt(1988, 12, 31).unwrap();
 
     let mut destination = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     destination.push(r"examples\results");
@@ -41,6 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         destination,
         sample_size: Some(50),
         run_off_unit: RunOffUnit::NoConversion,
+        generate_comparison_charts: true,
     };
 
     let mut model = Calibration::new(inputs)?;

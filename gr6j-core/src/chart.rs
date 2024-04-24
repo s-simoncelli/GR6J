@@ -42,7 +42,33 @@ fn obs_style() -> ShapeStyle {
     }
 }
 
-/// Generate the chart with the input data and the simulated run off of a GR6J model.
+/// Render the legend box.
+///
+/// # Arguments
+///
+/// * `context`: The chart context
+///
+/// returns: `()`
+fn render_legend_box<'a, DB: DrawingBackend, X, Y, XType>(
+    context: &mut ChartContext<'a, DB, Cartesian2d<X, Y>>,
+) -> ChartResult
+where
+    DB: 'a,
+    DB::ErrorType: 'static,
+    X: Ranged<ValueType = XType> + ValueFormatter<XType>,
+    Y: Ranged<ValueType = f64> + ValueFormatter<f64>,
+{
+    context
+        .configure_series_labels()
+        .border_style(GREY_A400)
+        .background_style(WHITE)
+        .label_font((FONT, 20))
+        .position(SeriesLabelPosition::Coordinate(2, 2))
+        .draw()?;
+    Ok(())
+}
+
+/// Generate the chart with the input data and the simulated run-off of a GR6J model.
 ///
 /// # Arguments
 ///
@@ -98,13 +124,7 @@ pub(crate) fn generate_summary_chart(model: &GR6JModel, results: &GR6JOutputs, d
 
         if idx == 2 && model.observed.is_some() {
             add_obs_flow_to_context(&mut cc, &time, model.observed.as_ref().unwrap())?;
-
-            cc.configure_series_labels()
-                .border_style(GREY_A400)
-                .background_style(WHITE)
-                .label_font((FONT, 20))
-                .position(SeriesLabelPosition::Coordinate(2, 2))
-                .draw()?;
+            render_legend_box(&mut cc)?;
         }
     }
 
@@ -186,11 +206,7 @@ where
     context
         .draw_series(LineSeries::new(
             time.iter().zip(observed).map(|(t, p)| (*t, *p)),
-            ShapeStyle {
-                color: BLACK.into(),
-                filled: false,
-                stroke_width: 1,
-            },
+            obs_style(),
         ))?
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], BLACK))
         .label("Observed");
@@ -255,6 +271,7 @@ where
         ))?
         .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], obs_style().color))
         .label("Observed");
+        render_legend_box(&mut cc)?;
     }
 
     Ok(())
@@ -487,13 +504,7 @@ pub(crate) fn save_flow_comparison_chart(
         colour: sim_style().color.to_rgba(),
     })?;
     add_obs_flow_to_context(&mut cc, time, observed)?;
-
-    cc.configure_series_labels()
-        .border_style(GREY_A400)
-        .background_style(WHITE)
-        .label_font((FONT, 20))
-        .position(SeriesLabelPosition::Coordinate(2, 2))
-        .draw()?;
+    render_legend_box(&mut cc)?;
 
     // Panel with log FDC
     render_fdc_panel::<BitMapBackend<'_>, LogCoord<f64>>(

@@ -37,16 +37,23 @@ pub struct Calibration<'a> {
     destination: PathBuf,
     /// The flow unit
     run_off_unit: RunOffUnit,
+    /// Whether to export the comparison of the observed and simulated run-off time series and
+    /// flow duration curves for each model.
+    generate_comparison_charts: bool,
 }
 
 /// The data collected by the parallel loop from each GR6J models.
 struct ParData {
+    /// The time vector
+    time: Vec<NaiveDate>,
     /// The data of all hydrological units.
     catchment: Vec<CatchmentData>,
     /// The simulated run-off.
     run_off: Vec<f64>,
     /// The metrics to use to assess the model performance.
     metrics: CalibrationMetric,
+    /// The observed run-off
+    observed: Option<Vec<f64>>,
 }
 
 const PARAMETER_HEADER: [&str; 7] = ["Simulation", "X1", "X2", "X3", "X4", "X5", "X6"];
@@ -121,6 +128,7 @@ impl<'a> Calibration<'a> {
             run_inputs: Some(run_inputs),
             run_off_unit: inputs.run_off_unit,
             destination,
+            generate_comparison_charts: inputs.generate_comparison_charts,
         })
     }
 
@@ -130,8 +138,6 @@ impl<'a> Calibration<'a> {
     /// returns: `Result<CalibrationOutputs, RunModelError>`
     pub fn run(&mut self) -> Result<CalibrationOutputs, RunModelError> {
         let run_inputs = self.run_inputs.take().unwrap();
-        let time: Vec<NaiveDate> = run_inputs[0].time.to_vec();
-        let observed = run_inputs[0].observed_runoff.unwrap();
 
         let par_data: Result<Vec<_>, _> = run_inputs
             .into_par_iter()
@@ -144,9 +150,11 @@ impl<'a> Calibration<'a> {
                     GR6JModel::new(model_inputs).map_err(|e| RunModelError::CalibrationError(model, e.to_string()))?;
                 let results = model.run()?;
                 Ok::<ParData, RunModelError>(ParData {
+                    time: results.time,
                     catchment: data.to_vec(),
                     run_off: results.run_off,
                     metrics: results.metrics.unwrap(),
+                    observed: model.observed,
                 })
             })
             .collect();
@@ -158,6 +166,8 @@ impl<'a> Calibration<'a> {
         }
 
         let mut par_data = par_data?;
+        let observed = par_data[0].observed.clone().unwrap();
+        let time: Vec<NaiveDate> = par_data[0].time.to_vec();
 
         // Group the catchment data by sub-catchment
         let first_catchment_data = par_data.first().expect("Cannot find any results").catchment.clone();
@@ -241,22 +251,24 @@ impl<'a> Calibration<'a> {
         }
 
         // Generate the comparison charts for the simulated vs. observed flow and FDC
-        (0..par_data.len()).into_par_iter().try_for_each(|model_id| {
-            info!("Generating run-off chart for model #{}", model_id + 1);
-            let dest = self.destination.join(format!("Flows_model{}.png", model_id + 1));
+        if self.generate_comparison_charts {
+            (0..par_data.len()).into_par_iter().try_for_each(|model_id| {
+                info!("Generating run-off chart for model #{}", model_id + 1);
+                let dest = self.destination.join(format!("Flows_model{}.png", model_id + 1));
 
-            save_flow_comparison_chart(
-                &time,
-                &run_off[model_id],
-                observed,
-                format!("Simulated vs. observed - Model #{}", model_id + 1),
-                &dest,
-                &self.run_off_unit,
-            )
-            .map_err(|e| RunModelError::CannotGenerateChart(dest.to_str().unwrap().to_string(), e.to_string()))?;
+                save_flow_comparison_chart(
+                    &time,
+                    &run_off[model_id],
+                    &observed,
+                    format!("Simulated vs. observed - Model #{}", model_id + 1),
+                    &dest,
+                    &self.run_off_unit,
+                )
+                .map_err(|e| RunModelError::CannotGenerateChart(dest.to_str().unwrap().to_string(), e.to_string()))?;
 
-            Ok::<(), RunModelError>(())
-        })?;
+                Ok::<(), RunModelError>(())
+            })?;
+        }
 
         Ok(CalibrationOutputs {
             time,
