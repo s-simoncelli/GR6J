@@ -4,7 +4,7 @@ use ::gr6j::inputs::CalibrationCatchmentData as RsCalibrationCatchmentData;
 use chrono::NaiveDate;
 use gr6j::calibration::Calibration as RsCalibration;
 use gr6j::inputs::CalibrationInputs as RsCalibrationInputs;
-use gr6j::outputs::{CalibrationOutputs as RsCalibrationOutputs, CalibrationParameterValueVector};
+use gr6j::outputs::CalibrationOutputs as RsCalibrationOutputs;
 use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyTuple};
@@ -256,7 +256,10 @@ impl Calibration {
         };
         let mut rs_calibration = RsCalibration::new(inputs).map_err(|e| PyValueError::new_err(e.to_string()))?;
 
-        let outputs = rs_calibration.run().map_err(|e| PyValueError::new_err(e.to_string()))?;
+        // release the GIL to prevent deadlocks when model runs with threads
+        let outputs = Python::with_gil(|py| {
+            py.allow_threads(move || rs_calibration.run().map_err(|e| PyValueError::new_err(e.to_string())))
+        })?;
         Ok(Calibration(outputs))
     }
 

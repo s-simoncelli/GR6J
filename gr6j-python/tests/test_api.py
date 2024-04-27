@@ -14,7 +14,7 @@ from gr6j import (
     X6,
     X5,
     X4,
-    X3,
+    X3, X1Range, X2Range, X3Range, X4Range, X5Range, X6Range,
 )
 
 
@@ -98,10 +98,10 @@ def test_calibration_values_out_of_range():
     with pytest.raises(ValueError):
         CalibrationCatchmentData(
             area=1,
-            x1_range=(2, 3000),
-            x2_range=(2, 3),
-            x3_range=(2, 3),
-            x4_range=(0, 3),
-            x5_range=(2, 3),
-            x6_range=(2, 3),
+            x1_range=X1Range(2, 3000),
+            x2_range=X2Range(2, 3),
+            x3_range=X3Range(2, 3),
+            x4_range=X4Range(0, 3),
+            x5_range=X5Range(2, 3),
+            x6_range=X6Range(2, 3),
         )

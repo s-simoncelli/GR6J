@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 from datetime import date
 from gr6j import (
@@ -13,6 +15,10 @@ from gr6j import (
     RunOffUnit,
     GR6JModel,
 )
+
+# Enable module logging
+logging.basicConfig(format="[%(asctime)-15s] %(levelname)s %(message)s")
+logging.getLogger().setLevel(logging.INFO)
 
 # Read the input data
 data = pd.read_csv(

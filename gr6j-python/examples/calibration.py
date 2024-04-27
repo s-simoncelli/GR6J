@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 
 import pandas as pd
@@ -14,6 +15,13 @@ from gr6j import (
     X6Range,
     Calibration,
 )
+
+# Enable module logging to check the calibration progress
+logging.basicConfig(format="[%(asctime)-15s] %(levelname)s %(message)s")
+logging.getLogger().setLevel(logging.INFO)
+
+# disable logger when running single model instances
+logging.getLogger("gr6j.model").disabled = True
 
 # Read the input data
 data = pd.read_csv(
@@ -47,7 +55,7 @@ inputs = CalibrationInputs(
     calibration_period=ModelPeriod(start=start, end=end),
     destination=".",
     run_off_unit=RunOffUnit.NO_CONVERSION,
-    sample_size=50,
+    sample_size=100,
 )
 
 # run the calibration

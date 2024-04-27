@@ -80,6 +80,8 @@ impl GR6JModel {
 
 #[pymodule]
 fn gr6j(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    pyo3_log::init();
+
     m.add_class::<X1>()?;
     m.add_class::<X2>()?;
     m.add_class::<X3>()?;
@@ -93,7 +95,6 @@ fn gr6j(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ModelPeriod>()?;
     m.add_class::<RunOffUnit>()?;
     m.add_class::<GR6JModelInputs>()?;
-
     m.add_class::<GR6JModel>()?;
 
     m.add_class::<X1Range>()?;
