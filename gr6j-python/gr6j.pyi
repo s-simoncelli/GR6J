@@ -1,6 +1,156 @@
 from datetime import date
 from enum import Enum
 
+class X1:
+    def __init__(self, value: float):
+        """
+        Set the maximum capacity of the production store (mm/day)
+        :param value: The parameter value.
+        """
+
+    @staticmethod
+    def unit() -> str:
+        """
+        The parameter unit of measurement.
+        """
+
+    @staticmethod
+    def min() -> str:
+        """
+        The parameter minimum value.
+        """
+
+    @staticmethod
+    def max() -> str:
+        """
+        The parameter maximum value.
+        """
+
+class X2:
+    def __init__(self, value: float):
+        """
+        Set the maximum capacity of the production store (mm/day)
+        :param value: The parameter value.
+        """
+
+    @staticmethod
+    def unit() -> str:
+        """
+        The parameter unit of measurement.
+        """
+
+    @staticmethod
+    def min() -> str:
+        """
+        The parameter minimum value.
+        """
+
+    @staticmethod
+    def max() -> str:
+        """
+        The parameter maximum value.
+        """
+
+class X3:
+    def __init__(self, value: float):
+        """
+        Set the maximum capacity of the production store (mm/day)
+        :param value: The parameter value.
+        """
+
+    @staticmethod
+    def unit() -> str:
+        """
+        The parameter unit of measurement.
+        """
+
+    @staticmethod
+    def min() -> str:
+        """
+        The parameter minimum value.
+        """
+
+    @staticmethod
+    def max() -> str:
+        """
+        The parameter maximum value.
+        """
+
+class X4:
+    def __init__(self, value: float):
+        """
+        Set the maximum capacity of the production store (mm/day)
+        :param value: The parameter value.
+        """
+
+    @staticmethod
+    def unit() -> str:
+        """
+        The parameter unit of measurement.
+        """
+
+    @staticmethod
+    def min() -> str:
+        """
+        The parameter minimum value.
+        """
+
+    @staticmethod
+    def max() -> str:
+        """
+        The parameter maximum value.
+        """
+
+class X5:
+    def __init__(self, value: float):
+        """
+        Set the maximum capacity of the production store (mm/day)
+        :param value: The parameter value.
+        """
+
+    @staticmethod
+    def unit() -> str:
+        """
+        The parameter unit of measurement.
+        """
+
+    @staticmethod
+    def min() -> str:
+        """
+        The parameter minimum value.
+        """
+
+    @staticmethod
+    def max() -> str:
+        """
+        The parameter maximum value.
+        """
+
+class X6:
+    def __init__(self, value: float):
+        """
+        Set the maximum capacity of the production store (mm/day)
+        :param value: The parameter value.
+        """
+
+    @staticmethod
+    def unit() -> str:
+        """
+        The parameter unit of measurement.
+        """
+
+    @staticmethod
+    def min() -> str:
+        """
+        The parameter minimum value.
+        """
+
+    @staticmethod
+    def max() -> str:
+        """
+        The parameter maximum value.
+        """
+
 class StoreLevels:
     """
     Class to define custom store levels to use at the beginning of
@@ -30,19 +180,19 @@ class CatchmentData:
 
     area: float
     """ The area in km2 """
-    x1: float
+    x1: X1
     """  Maximum capacity of the production store (mm/day). """
-    x2: float
+    x2: X2
     """ Inter-catchment (or groundwater) exchange coefficient (mm/day). """
-    x3: float
+    x3: X3
     """ One-day-ahead maximum capacity of the routing store (mm/day). """
-    x4: float
+    x4: X4
     """ Time base of unit hydrograph (days). """
-    x5: float
+    x5: X5
     """  Inter-catchment exchange threshold. This is a dimensionless threshold
     parameter that allows a change in the direction of the groundwater exchange
     depending on the capacity of the routing store level. """
-    x6: float
+    x6: X6
     """ Time constant of exponential store (mm). """
     store_levels: StoreLevels | None = None
     """ The initial in the store levels. """
@@ -50,12 +200,12 @@ class CatchmentData:
     def __init__(
         self,
         area: float,
-        x1: float,
-        x2: float,
-        x3: float,
-        x4: float,
-        x5: float,
-        x6: float,
+        x1: X1,
+        x2: X2,
+        x3: X3,
+        x4: X4,
+        x5: X5,
+        x6: X6,
         store_levels: StoreLevels | None = None,
     ):
         """
@@ -315,7 +465,7 @@ class GR6JModel:
     def __init__(self, input: GR6JModelInputs):
         """
         Load the model with input data.
-        :param input: The input data. See GR6JModelInputs how to build this class.
+        :param input: The input data. See `GR6JModelInputs` how to build this class.
         """
 
     def run(self) -> GR6JModelOutputs:
@@ -323,4 +473,280 @@ class GR6JModel:
         Run the model and export charts and outputs.
         :return: A dictionary with the "time" and "run_off" keys containing the
         simulated time and run off values.
+        """
+
+class X1Range:
+    lower_bound: float
+    """ The parameter range lower bound. """
+    upper_bound: float
+    """ The parameter range upper bound. """
+
+    def __init__(self, lower_bound: float | None, upper_bound: float | None):
+        """
+        Set the range for the maximum capacity of the production store (mm/day).
+        :param lower_bound: The parameter lower bound. If None the X1 minimum value
+        will be used.
+        :param upper_bound: The parameter upper bound. If None the X1 maximum value
+        will be used.
+        """
+
+class X2Range:
+    lower_bound: float
+    """ The parameter range lower bound. """
+    upper_bound: float
+    """ The parameter range upper bound. """
+
+    def __init__(self, lower_bound: float | None, upper_bound: float | None):
+        """
+        Set the range for the inter-catchment (or groundwater) exchange coefficient
+        (mm/day).
+        :param lower_bound: The parameter lower bound. If None the X2 minimum value
+        will be used.
+        :param upper_bound: The parameter upper bound. If None the X2 maximum value
+        will be used.
+        """
+
+class X3Range:
+    lower_bound: float
+    """ The parameter range lower bound. """
+    upper_bound: float
+    """ The parameter range upper bound. """
+
+    def __init__(self, lower_bound: float | None, upper_bound: float | None):
+        """
+        Set the range for the one-day-ahead maximum capacity of the routing store (mm/day).
+        :param lower_bound: The parameter lower bound. If None the X3 minimum value
+        will be used.
+        :param upper_bound: The parameter upper bound. If None the X3 maximum value
+        will be used.
+        """
+
+class X4Range:
+    lower_bound: float
+    """ The parameter range lower bound. """
+    upper_bound: float
+    """ The parameter range upper bound. """
+
+    def __init__(self, lower_bound: float | None, upper_bound: float | None):
+        """
+        Set the range for the time base of unit hydrograph (days).
+        :param lower_bound: The parameter lower bound. If None the X4 minimum value
+        will be used.
+        :param upper_bound: The parameter upper bound. If None the X4 maximum value
+        will be used.
+        """
+
+class X5Range:
+    lower_bound: float
+    """ The parameter range lower bound. """
+    upper_bound: float
+    """ The parameter range upper bound. """
+
+    def __init__(self, lower_bound: float | None, upper_bound: float | None):
+        """
+        Set the range for the inter-catchment exchange threshold.
+        :param lower_bound: The parameter lower bound. If None the X5 minimum value
+        will be used.
+        :param upper_bound: The parameter upper bound. If None the X5 maximum value
+        will be used.
+        """
+
+class X6Range:
+    lower_bound: float
+    """ The parameter range lower bound. """
+    upper_bound: float
+    """ The parameter range upper bound. """
+
+    def __init__(self, lower_bound: float | None, upper_bound: float | None):
+        """
+        Set the range for the time constant of exponential store (mm).
+        :param lower_bound: The parameter lower bound. If None the X6 minimum value
+        will be used.
+        :param upper_bound: The parameter upper bound. If None the X6 maximum value
+        will be used.
+        """
+
+class CalibrationCatchmentData:
+    """
+    The data for the catchment or hydrological unit to calibrate.
+    """
+
+    area: float
+    """ The catchment os sub-catchment area (km2). """
+    x1_range: X1Range
+    """ Range for the maximum capacity of the production store (mm/day). """
+    x2_range: X2Range
+    """ Range for the inter-catchment (or groundwater) exchange coefficient (mm/day). """
+    x3_range: X3Range
+    """ Range for the one-day-ahead maximum capacity of the routing store (mm/day). """
+    x4_range: X4Range
+    """ Range for the time base of unit hydrograph (days). """
+    x5_range: X5Range
+    """ Range for the inter-catchment exchange threshold. """
+    x6_range: X6Range
+    """ Range for the time constant of exponential store (mm) """
+
+    def __init__(
+        self,
+        area: float,
+        x1_range: X1Range,
+        x2_range: X2Range,
+        x3_range: X3Range,
+        x4_range: X4Range,
+        x5_range: X5Range,
+        x6_range: X6Range,
+    ):
+        """
+        Define the data for the catchment or hydrological unit to calibrate. With this
+        class you can specify the parameter ranges to use when random combinations of
+        the parameters are generated to calibrate a model.
+        :param area: The catchment os sub-catchment area (km2).
+        :param x1_range: Range for the maximum capacity of the production store
+        (mm/day). This is a two-item tuple with the lower an upper bound.
+        :param x2_range: Range for the inter-catchment (or groundwater) exchange
+        coefficient (mm/day). This is a two-item tuple with the lower an upper bound.
+        This is a two-item tuple with the lower an upper bound.
+        :param x3_range: Range for the one-day-ahead maximum capacity of the routing
+        store (mm/day). This is a two-item tuple with the lower an upper bound.
+        :param x4_range: Range for the time base of unit hydrograph (days). This is a
+        two-item tuple with the lower an upper bound.
+        :param x5_range: Range for the inter-catchment exchange threshold. This is a
+        two-item tuple with the lower an upper bound.
+        :param x6_range: Range for the time constant of exponential store (mm). This is
+        a two-item tuple with the lower an upper bound.
+        """
+
+class CalibrationInputs:
+    time: list[date]
+    """ Vector of time. """
+    precipitation: list[float]
+    """ Input vector of total precipitation (mm/day). """
+    evapotranspiration: list[float]
+    """ Input vector of potential evapotranspiration (PE) (mm/day). """
+    observed_runoff: list[float]
+    """ The time series of the observed run-off. """
+    catchment: CalibrationCatchmentData | list[CalibrationCatchmentData]
+    """ Area and GR6J parameter ranges for one catchment or a list of sub-catchments 
+    (in case you want to divide the catchment into independent hydrological units). """
+    calibration_period: ModelPeriod
+    """ The start and end date of the model run. """
+    destination: str
+    """ The path where to export (1) the comparison charts for the observed vs. 
+    simulated flow, (2) the flow duration curves, (3) the scatter charts of the 
+    calibration metrics to select the best calibration parameters and (4) a CSV file 
+    with metric values. The files are exported to a sub-folder named with the run 
+    timestamp. """
+    run_off_unit: RunOffUnit
+    """ The unit of measurement of the observed run-off. """
+    sample_size: int
+    """ The number of random combinations of the model parameters """
+    generate_comparison_charts: bool
+    """ Whether to export the comparison of the observed and simulated run-off time 
+    series and flow duration curves for each model. """
+
+    def __init__(
+        self,
+        time: list[date],
+        precipitation: list[float],
+        evapotranspiration: list[float],
+        observed_runoff: list[float],
+        catchment: CalibrationCatchmentData | list[CalibrationCatchmentData],
+        calibration_period: ModelPeriod,
+        destination: str,
+        run_off_unit: RunOffUnit,
+        sample_size: int | None = None,
+        generate_comparison_charts: bool | None = None,
+    ):
+        """
+        Define the input data to calibrate a GR6J model.
+        :param time: Vector of time.
+        :param precipitation: Input vector of total precipitation (mm/day)..
+        :param evapotranspiration: Input vector of potential evapotranspiration (PE)
+        (mm/day).
+        :param observed_runoff: The time series of the observed run-off. This will be
+        compared against the generated simulated run-off series to calculate the
+        calibration metrics.
+        :param catchment: Area and GR6J parameter ranges for one catchment or a list
+        of sub-catchments (in case you want to divide the catchment into independent
+        hydrological units). See `CalibrationCatchmentData`.
+        :param calibration_period: The start and end date of the model run. The model
+        can be run on a shorter time period compared to `time`.
+        :param destination: The path where to export (1) the comparison charts for the
+        observed vs. simulated flow, (2) the flow duration curves, (3) the scatter charts
+        of the calibration metrics to select the best calibration parameters and (4) a
+        CSV file with metric values. The files are exported to a sub-folder named with
+        the run timestamp.
+        :param run_off_unit: Convert the simulated run-off to the desired unit of
+        measurement, so that it matches the unit of the observed run-off.
+        :param sample_size: Generate the provided number of samples. Each sample
+        contains a random combination of the model parameters based on the ranges
+        given in the `catchment` argument. Default to `200` when `None`.
+        :param generate_comparison_charts: Whether to export the comparison of the
+        observed and simulated run-off time series and flow duration curves for each
+         model. If `true`, the tool will generate as many as `self.sample_size` figures.
+        """
+
+class Calibration:
+    time: list[date]
+    """  The vector with the dates. """
+    run_off: list[list[float]]
+    """ The run-off for each simulated model. The size of the vector is 
+    `CalibrationInputs.sample_size`. """
+    nash_sutcliffe: list[float]
+    """ The list of the Nash-Sutcliffe coefficients for all models. """
+    log_nash_sutcliffe: list[float]
+    """ The list of the log Nash-Sutcliffe coefficients for all models. """
+    non_parametric_kling_gupta: list[float]
+    """ The list of the non-parametric Kling-Gupta coefficients for all models. """
+    rmse: list[float]
+    """ The list of the oot-mean-square errors for all models. """
+    volume_error: list[float]
+    """ The list of the volume errors for all models. """
+
+    def __init__(self, inputs: CalibrationInputs):
+        """
+        Run the calibration.
+        :param inputs: The calibration inputs.
+        """
+
+    def x1_vec(self, catchment_index: int) -> list[float]:
+        """
+        Get the vector of X1 values for a catchment for all models.
+        :param catchment_index: The index (0 based) of the catchment.
+        :return: The parameter values.
+        """
+
+    def x2_vec(self, catchment_index: int) -> list[float]:
+        """
+        Get the vector of X2 values for a catchment for all models.
+        :param catchment_index: The index (0 based) of the catchment.
+        :return: The parameter values.
+        """
+
+    def x3_vec(self, catchment_index: int) -> list[float]:
+        """
+        Get the vector of X3 values for a catchment for all models.
+        :param catchment_index: The index (0 based) of the catchment.
+        :return: The parameter values.
+        """
+
+    def x4_vec(self, catchment_index: int) -> list[float]:
+        """
+        Get the vector of X4 values for a catchment for all models.
+        :param catchment_index: The index (0 based) of the catchment.
+        :return: The parameter values.
+        """
+
+    def x5_vec(self, catchment_index: int) -> list[float]:
+        """
+        Get the vector of X5 values for a catchment for all models.
+        :param catchment_index: The index (0 based) of the catchment.
+        :return: The parameter values.
+        """
+
+    def x6_vec(self, catchment_index: int) -> list[float]:
+        """
+        Get the vector of X6 values for a catchment for all models.
+        :param catchment_index: The index (0 based) of the catchment.
+        :return: The parameter values.
         """

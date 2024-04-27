@@ -486,9 +486,9 @@ pub struct VariableCatchmentData {
     pub x1: X1Range,
     /// The range for the inter-catchment (or groundwater) exchange coefficient (mm/day).
     pub x2: X2Range,
-    /// The range for the one-day-ahead maximum capacity of the routing store (mm/day)
+    /// The range for the one-day-ahead maximum capacity of the routing store (mm/day).
     pub x3: X3Range,
-    /// The range for the time base of unit hydrograph (days)
+    /// The range for the time base of unit hydrograph (days).
     pub x4: X4Range,
     /// The range for the inter-catchment exchange threshold.
     pub x5: X5Range,

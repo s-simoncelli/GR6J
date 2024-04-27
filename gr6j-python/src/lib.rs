@@ -1,13 +1,16 @@
-use crate::inputs::{CatchmentData, GR6JModelInputs, ModelPeriod, RunOffUnit};
+use crate::calibration::{Calibration, CalibrationCatchmentData, CalibrationInputs};
+use crate::inputs::{CatchmentData, GR6JModelInputs, ModelPeriod, RunOffUnit, StoreLevels};
 use crate::outputs::{CalibrationMetric, GR6JOutputs, Metric, ModelStepData};
+use crate::parameter::{X1Range, X2Range, X3Range, X4Range, X5Range, X6Range, X1, X2, X3, X4, X5, X6};
 use ::gr6j::inputs::{GR6JModelInputs as RsGR6JModelInputs, ModelPeriod as RsModelPeriod};
 use ::gr6j::model::GR6JModel as RsGR6JModel;
-use inputs::StoreLevels;
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
+mod calibration;
 mod inputs;
 mod outputs;
+mod parameter;
 
 #[pyclass]
 struct GR6JModel {
@@ -19,14 +22,14 @@ struct GR6JModel {
 impl GR6JModel {
     #[new]
     fn rs_new(inputs: GR6JModelInputs) -> PyResult<GR6JModel> {
-        let run_period = inputs.run_period.rs_period;
+        let run_period = inputs.run_period.0;
         let inputs = RsGR6JModelInputs {
             time: &inputs.time,
             precipitation: &inputs.precipitation,
             evapotranspiration: &inputs.evapotranspiration,
             catchment: inputs.rs_catchment,
             run_period,
-            warmup_period: inputs.warmup_period.map(|d| d.rs_period),
+            warmup_period: inputs.warmup_period.map(|d| d.0),
             destination: inputs.destination,
             observed_runoff: inputs.observed_runoff.as_deref(),
             run_off_unit: inputs.run_off_unit.unwrap_or_default().into(),
@@ -77,6 +80,12 @@ impl GR6JModel {
 
 #[pymodule]
 fn gr6j(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<X1>()?;
+    m.add_class::<X2>()?;
+    m.add_class::<X3>()?;
+    m.add_class::<X4>()?;
+    m.add_class::<X5>()?;
+    m.add_class::<X6>()?;
     m.add_class::<StoreLevels>()?;
     m.add_class::<CatchmentData>()?;
     m.add_class::<Metric>()?;
@@ -84,7 +93,18 @@ fn gr6j(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ModelPeriod>()?;
     m.add_class::<RunOffUnit>()?;
     m.add_class::<GR6JModelInputs>()?;
+
     m.add_class::<GR6JModel>()?;
+
+    m.add_class::<X1Range>()?;
+    m.add_class::<X2Range>()?;
+    m.add_class::<X3Range>()?;
+    m.add_class::<X4Range>()?;
+    m.add_class::<X5Range>()?;
+    m.add_class::<X6Range>()?;
+    m.add_class::<CalibrationCatchmentData>()?;
+    m.add_class::<CalibrationInputs>()?;
+    m.add_class::<Calibration>()?;
 
     Ok(())
 }

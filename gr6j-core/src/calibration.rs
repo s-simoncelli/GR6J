@@ -32,7 +32,7 @@ use std::path::PathBuf;
 ///   6) Pick the best calibration parameter set.
 pub struct Calibration<'a> {
     /// The vector with model inputs to run a [`GR6JModel`].
-    run_inputs: Option<Vec<GR6JModelInputs<'a>>>,
+    run_inputs: Vec<GR6JModelInputs<'a>>,
     /// The destination where to save the charts and diagnostic data.
     destination: PathBuf,
     /// The flow unit
@@ -125,7 +125,7 @@ impl<'a> Calibration<'a> {
         info!("Created {:?} models", run_inputs.len());
 
         Ok(Self {
-            run_inputs: Some(run_inputs),
+            run_inputs,
             run_off_unit: inputs.run_off_unit,
             destination,
             generate_comparison_charts: inputs.generate_comparison_charts,
@@ -137,7 +137,7 @@ impl<'a> Calibration<'a> {
     ///
     /// returns: `Result<CalibrationOutputs, RunModelError>`
     pub fn run(&mut self) -> Result<CalibrationOutputs, RunModelError> {
-        let run_inputs = self.run_inputs.take().unwrap();
+        let run_inputs = mem::take(&mut self.run_inputs);
 
         let par_data: Result<Vec<_>, _> = run_inputs
             .into_par_iter()

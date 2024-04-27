@@ -1,8 +1,10 @@
-use ::gr6j::error::ModelPeriodError;
-use ::gr6j::inputs::StoreLevels as RsStoreLevels;
-use ::gr6j::inputs::{CatchmentData as RsCatchmentData, ModelPeriod as RsModelPeriod, RunOffUnit as RsRunOffUnit};
+use crate::parameter::{X1, X2, X3, X4, X5, X6};
+use ::gr6j::inputs::{
+    CatchmentData as RsCatchmentData, ModelPeriod as RsModelPeriod, RunOffUnit as RsRunOffUnit,
+    StoreLevels as RsStoreLevels,
+};
 use chrono::NaiveDate;
-use gr6j::parameter::{Parameter, X1, X2, X3, X4, X5, X6};
+use gr6j::parameter::Parameter;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -56,17 +58,17 @@ pub struct CatchmentData {
     #[pyo3(get)]
     area: f64,
     #[pyo3(get)]
-    x1: f64,
+    x1: X1,
     #[pyo3(get)]
-    x2: f64,
+    x2: X2,
     #[pyo3(get)]
-    x3: f64,
+    x3: X3,
     #[pyo3(get)]
-    x4: f64,
+    x4: X4,
     #[pyo3(get)]
-    x5: f64,
+    x5: X5,
     #[pyo3(get)]
-    x6: f64,
+    x6: X6,
     #[pyo3(get)]
     store_levels: Option<StoreLevels>,
     pub rs_catchment: RsCatchmentData,
@@ -78,22 +80,22 @@ impl CatchmentData {
     #[new]
     pub fn new(
         area: f64,
-        x1: f64,
-        x2: f64,
-        x3: f64,
-        x4: f64,
-        x5: f64,
-        x6: f64,
+        x1: X1,
+        x2: X2,
+        x3: X3,
+        x4: X4,
+        x5: X5,
+        x6: X6,
         store_levels: Option<StoreLevels>,
     ) -> PyResult<CatchmentData> {
         let rs_catchment = RsCatchmentData {
             area,
-            x1: X1::new(x1).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            x2: X2::new(x2).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            x3: X3::new(x3).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            x4: X4::new(x4).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            x5: X5::new(x5).map_err(|e| PyValueError::new_err(e.to_string()))?,
-            x6: X6::new(x6).map_err(|e| PyValueError::new_err(e.to_string()))?,
+            x1: Box::from(x1.0),
+            x2: Box::from(x2.0),
+            x3: Box::from(x3.0),
+            x4: Box::from(x4.0),
+            x5: Box::from(x5.0),
+            x6: Box::from(x6.0),
             store_levels: store_levels.map(Into::into),
         };
         Ok(CatchmentData {
@@ -117,7 +119,14 @@ impl CatchmentData {
         };
         Ok(format!(
             "CatchmentData(area={},x1={},x2={},x3={},x4={},x5={},x6={},store_levels={})",
-            self.area, self.x1, self.x2, self.x3, self.x4, self.x5, self.x6, store_levels
+            self.area,
+            self.x1.0.value(),
+            self.x2.0.value(),
+            self.x3.0.value(),
+            self.x4.0.value(),
+            self.x5.0.value(),
+            self.x6.0.value(),
+            store_levels
         ))
     }
 
@@ -128,31 +137,28 @@ impl CatchmentData {
 
 #[pyclass]
 #[derive(Clone, Copy, Debug)]
-pub struct ModelPeriod {
-    #[pyo3(get)]
-    start: NaiveDate,
-    #[pyo3(get)]
-    end: NaiveDate,
-    pub rs_period: RsModelPeriod,
-}
-
-impl TryFrom<ModelPeriod> for RsModelPeriod {
-    type Error = ModelPeriodError;
-    fn try_from(s: ModelPeriod) -> Result<Self, Self::Error> {
-        RsModelPeriod::new(s.start, s.end)
-    }
-}
+pub struct ModelPeriod(pub RsModelPeriod);
 
 #[pymethods]
 impl ModelPeriod {
     #[new]
     pub fn new(start: NaiveDate, end: NaiveDate) -> PyResult<Self> {
         let rs_period = RsModelPeriod::new(start, end).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        Ok(ModelPeriod { start, end, rs_period })
+        Ok(ModelPeriod(rs_period))
+    }
+
+    #[getter]
+    fn start(&self) -> NaiveDate {
+        self.0.start
+    }
+
+    #[getter]
+    fn end(&self) -> NaiveDate {
+        self.0.end
     }
 
     pub fn __repr__(&self) -> PyResult<String> {
-        Ok(format!("ModelPeriod(start={},end={})", self.start, self.end,))
+        Ok(format!("ModelPeriod(start={},end={})", self.0.start, self.0.end,))
     }
 
     pub fn __str__(&self) -> String {
@@ -191,6 +197,7 @@ impl From<RunOffUnit> for RsRunOffUnit {
     }
 }
 
+// NOTE: cannot use enum because pyo3 does not support complex types
 #[pyclass]
 #[derive(Clone)]
 pub struct CatchmentDataVec(pub Vec<CatchmentData>);

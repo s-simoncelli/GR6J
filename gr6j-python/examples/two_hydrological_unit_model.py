@@ -1,6 +1,18 @@
 import pandas as pd
 from datetime import date
-from gr6j import GR6JModelInputs, CatchmentData, ModelPeriod, RunOffUnit, GR6JModel
+from gr6j import (
+    X1,
+    X2,
+    X3,
+    X4,
+    X5,
+    X6,
+    GR6JModelInputs,
+    CatchmentData,
+    ModelPeriod,
+    RunOffUnit,
+    GR6JModel,
+)
 
 # Read the input data
 data = pd.read_csv(
@@ -20,8 +32,18 @@ inputs = GR6JModelInputs(
     evapotranspiration=data["E"].tolist(),
     # create two hydrological units of sub-catchments
     catchment=[
-        CatchmentData(area=2.0, x1=31, x2=3.47, x3=32, x4=2.1, x5=0.55, x6=5.3),
-        CatchmentData(area=0.4, x1=1000, x2=1, x3=3, x4=1.2, x5=3, x6=1.3),
+        CatchmentData(
+            area=2.0,
+            x1=X1(31),
+            x2=X2(3.47),
+            x3=X3(32),
+            x4=X4(2.1),
+            x5=X5(0.55),
+            x6=X6(5.3),
+        ),
+        CatchmentData(
+            area=0.4, x1=X1(1000), x2=X2(1), x3=X3(3), x4=X4(1.2), x5=X5(3), x6=X6(1.3)
+        ),
     ],
     run_period=ModelPeriod(start=start, end=end),
     # simulated run off and FDC will be exported as CSV files and figures
