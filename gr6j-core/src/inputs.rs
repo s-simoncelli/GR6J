@@ -166,7 +166,7 @@ pub struct CalibrationInputs<'a> {
     pub time: &'a [NaiveDate],
     /// Input vector of total precipitation (mm/day).
     pub precipitation: &'a [f64],
-    /// input vector of potential evapotranspiration (PE) (mm/day).
+    /// Input vector of potential evapotranspiration (PE) (mm/day).
     pub evapotranspiration: &'a [f64],
     /// The time series of the observed run-off. This will be compared against the generated
     /// simulated run-off series to calculate the calibration metrics.

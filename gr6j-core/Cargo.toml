@@ -1,8 +1,14 @@
 [package]
 name = "gr6j-core"
 version = "0.1.0"
-authors = ["Stefano Simoncelli"]
+authors = ["Stefano Simoncelli <stefano@simoncelli.co>"]
 edition = "2021"
+description = "A Rust implementation of the air-GR6J model."
+readme = "../README.md"
+repository = "https://github.com/s-simoncelli/GR6J/"
+license = "GPL-3"
+keywords = ["simulation", "runoff", "water", "gr6j", "modelling"]
+categories = ["science", "simulation"]
 
 [lib]
 name = "gr6j"

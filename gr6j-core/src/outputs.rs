@@ -193,11 +193,11 @@ impl CalibrationParameterValueVector {
     pub fn to_vec_x4(&self) -> Vec<f64> {
         self.0.iter().map(|c| c.x4).collect()
     }
-    /// Get the vector of X4 values for all models.
+    /// Get the vector of X5 values for all models.
     pub fn to_vec_x5(&self) -> Vec<f64> {
         self.0.iter().map(|c| c.x5).collect()
     }
-    /// Get the vector of X4 values for all models.
+    /// Get the vector of X6 values for all models.
     pub fn to_vec_x6(&self) -> Vec<f64> {
         self.0.iter().map(|c| c.x6).collect()
     }
