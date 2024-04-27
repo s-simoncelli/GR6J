@@ -20,24 +20,16 @@ impl IntoPy<PyObject> for PyParameterRange {
     }
 }
 
-// TODO pyget all
-#[pyclass]
+#[pyclass(get_all)]
 #[derive(Debug, Clone)]
 /// The data for the catchment or hydrological unit to calibrate.
 pub struct CalibrationCatchmentData {
-    #[pyo3(get)]
     area: f64,
-    #[pyo3(get)]
     x1_range: X1Range,
-    #[pyo3(get)]
     x2_range: X2Range,
-    #[pyo3(get)]
     x3_range: X3Range,
-    #[pyo3(get)]
     x4_range: X4Range,
-    #[pyo3(get)]
     x5_range: X5Range,
-    #[pyo3(get)]
     x6_range: X6Range,
 }
 
