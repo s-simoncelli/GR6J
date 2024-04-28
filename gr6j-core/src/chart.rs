@@ -313,7 +313,7 @@ pub(crate) fn save_fdc_chart(
     };
 
     render_fdc_panel::<BitMapBackend<'_>, RangedCoordf64>(
-        &panels[1],
+        &panels[0],
         simulated.clone(),
         &model.run_off_unit,
         observed.clone(),
