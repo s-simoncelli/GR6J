@@ -5,6 +5,10 @@
 #
 name: python
 
+defaults:
+  run:
+    working-directory: gr6j-python
+
 on:
   push:
     branches:
