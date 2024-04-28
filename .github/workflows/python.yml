@@ -13,58 +13,44 @@ permissions:
   contents: read
 
 jobs:
-  linux:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: ubuntu-latest
-            target: x86_64
-          - runner: ubuntu-latest
-            target: x86
-          - runner: ubuntu-latest
-            target: aarch64
-          - runner: ubuntu-latest
-            target: armv7
-          - runner: ubuntu-latest
-            target: s390x
-          - runner: ubuntu-latest
-            target: ppc64le
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Install fontconfig
-        run: sudo apt-get install -y fontconfig libfontconfig-dev libfontconfig1 libfontconfig1-dev
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
-          sccache: 'true'
-          manylinux: auto
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux-${{ matrix.platform.target }}
-          path: dist
+  # Ubuntu does not build with fontconfig dev
+  #  linux:
+  #    runs-on: ubuntu-latest
+  #    strategy:
+  #      matrix:
+  #        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+  #    steps:
+  #      - uses: actions/checkout@v4
+  #      - uses: actions/setup-python@v5
+  #        with:
+  #          python-version: ${{ matrix.python-version }}
+  #          architecture: x64
+  #      - name: Install fontconfig
+  #        run: sudo apt-get install -y fontconfig libfontconfig-dev libfontconfig1 libfontconfig1-dev
+  #      - name: Build wheels
+  #        uses: PyO3/maturin-action@v1
+  #        with:
+  #          target: ${{ matrix.platform.target }}
+  #          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
+  #          sccache: 'true'
+  #          manylinux: auto
+  #      - name: Upload wheels
+  #        uses: actions/upload-artifact@v4
+  #        with:
+  #          name: wheels-linux-${{ matrix.platform.target }}
+  #          path: dist
 
   windows:
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: windows-latest
     strategy:
       matrix:
-        platform:
-          - runner: windows-latest
-            target: x64
-          - runner: windows-latest
-            target: x86
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          architecture: ${{ matrix.platform.target }}
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -78,19 +64,16 @@ jobs:
           path: dist
 
   macos:
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: macos-latest
     strategy:
       matrix:
-        platform:
-          - runner: macos-latest
-            target: x86_64
-          - runner: macos-14
-            target: aarch64
+        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -122,7 +105,8 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
-    needs: [ linux, windows, macos, sdist ]
+    needs: [ windows, macos, sdist ]
+    #    needs: [ linux, windows, macos, sdist ]
     steps:
       - uses: actions/download-artifact@v4
       - name: Publish to PyPI
