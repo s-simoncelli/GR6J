@@ -15,9 +15,6 @@ permissions:
 jobs:
   linux:
     runs-on: ${{ matrix.platform.runner }}
-    defaults:
-      run:
-        working-directory: gr6j-python
     strategy:
       matrix:
         platform:
@@ -42,7 +39,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter
+          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
           sccache: 'true'
           manylinux: auto
       - name: Upload wheels
@@ -53,9 +50,6 @@ jobs:
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
-    defaults:
-      run:
-        working-directory: gr6j-python
     strategy:
       matrix:
         platform:
@@ -73,7 +67,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter
+          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -83,9 +77,6 @@ jobs:
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
-    defaults:
-      run:
-        working-directory: gr6j-python
     strategy:
       matrix:
         platform:
@@ -102,7 +93,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter
+          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -112,16 +103,13 @@ jobs:
 
   sdist:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: gr6j-python
     steps:
       - uses: actions/checkout@v4
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist
+          args: --out -m gr6j-python/Cargo.toml dist
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
@@ -130,10 +118,7 @@ jobs:
 
   release:
     name: Release
-    runs-on: ubuntu-latest    
-    defaults:
-      run:
-        working-directory: gr6j-python
+    runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
     needs: [ linux, windows, macos, sdist ]
     steps:
