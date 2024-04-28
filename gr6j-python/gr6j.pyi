@@ -1,6 +1,8 @@
 from datetime import date
 from enum import Enum
 
+import pandas as pd
+
 
 class X1:
     def __init__(self, value: float):
@@ -488,7 +490,7 @@ class GR6JModelOutputs:
     Fetch the results. To get the time and run-off vector as Pandas DataFrame use:
 
         results = model.run()
-        print(pd.DataFrame(zip(results.time, results.run_off), columns=["Time", "Run off"]))
+        print(results.to_dataframe())
 
     `self.catchment_data` contains the results for each sub-catchment or hydrological
     unit (HU) and time step. For example if you have two HU and want to get the
@@ -507,6 +509,12 @@ class GR6JModelOutputs:
     results for each sub-catchment or hydrological unit (with one catchment there is 
     only one list). Each nested list contains the results (as instances of 
     `ModelStepData`) for each time steps for the sub-model. """
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Get a DataFrame containing the time and the simulated run-off.
+        :return: The DataFrame with the run-off.
+        """
 
 
 class GR6JModel:

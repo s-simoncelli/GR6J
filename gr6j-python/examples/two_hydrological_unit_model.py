@@ -62,10 +62,8 @@ inputs = GR6JModelInputs(
 model = GR6JModel(inputs)
 results = model.run()
 
-# Get the time and run-off vector as Pandas DataFrame use:
-df = pd.DataFrame(zip(results.time, results.run_off), columns=["Time", "Run off"])
-df.set_index("Time", inplace=True)
-print(df)
+# Get the time and run-off vector as Pandas DataFrame
+print(results.to_dataframe())
 
 # Get the exchange from routing store for the only catchment and third time step
 print(results.catchment_outputs[0][2].exchange_from_routing_store)

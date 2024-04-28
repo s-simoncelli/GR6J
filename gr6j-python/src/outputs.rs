@@ -3,6 +3,7 @@ use ::gr6j::metric::{CalibrationMetric as RsCalibrationMetric, Metric as RsMetri
 use ::gr6j::outputs::ModelStepData as RsModelStepData;
 use chrono::NaiveDate;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 #[pyclass(get_all)]
 #[derive(Clone)]
@@ -132,6 +133,7 @@ pub struct GR6JOutputs {
     pub metrics: Option<CalibrationMetric>,
 }
 
+#[pymethods]
 impl GR6JOutputs {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
@@ -144,5 +146,26 @@ impl GR6JOutputs {
 
     fn __str__(&self) -> String {
         self.__repr__().unwrap()
+    }
+
+    pub fn to_dataframe(&self) -> PyResult<PyObject> {
+        let df: PyObject = Python::with_gil(|py| {
+            let pd = py.import_bound("pandas")?;
+            let builtins = PyModule::import_bound(py, "builtins")?;
+            let data: PyObject = builtins
+                .getattr("zip")?
+                .call1((self.time.clone(), self.run_off.clone()))?
+                .extract()?;
+            let kwargs = PyDict::new_bound(py);
+            kwargs.set_item("columns", ["Time", "Run off"])?;
+
+            let df: PyObject = pd.call_method("DataFrame", (data,), Some(&kwargs))?.extract()?;
+            let kwargs = PyDict::new_bound(py);
+            kwargs.set_item("inplace", true)?;
+            df.call_method_bound(py, "set_index", ("Time",), Some(&kwargs))?;
+            Ok::<PyObject, PyErr>(df)
+        })?;
+
+        Ok(df)
     }
 }
