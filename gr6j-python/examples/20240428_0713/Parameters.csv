@@ -1,0 +1,8 @@
+Parameter,Value,Unit,Description
+Area,1,Km2,Catchment area
+X1,31,mm,production store capacity (X1)
+X2,3.47,mm,maximum capacity of the routing store (X2)
+X3,32,mm,routing store capacity (X3)
+X4,2.1,days,time base of unit hydrograph (X4)
+X5,0.55,-,inter-catchment exchange threshold (X5)
+X6,5.3,mm,time constant of exponential store (X6)

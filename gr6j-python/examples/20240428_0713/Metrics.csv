@@ -1,0 +1,4 @@
+Metric,Value,Ideal value
+Nash-Sutcliffe,0.4008968460637432,1
+Nash-Sutcliffe with log flows,-182.0307084610968,1
+Non-parametric Kling-Gupta,0.8272261206545478,1
