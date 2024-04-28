@@ -1,11 +1,8 @@
-# GR6J rainfall-runoff model for Rust and Python
+# GR6J rainfall-runoff model for Rust
 
-![Logo](./logo.png)
+![Logo](../logo.png)
 
-This repository contains the GR6J rainfall-runoff model implemented in the Rust language. This
-tool can be either used as **Python package**, available on [PyPI](https://pypi.org/project/gr6j/), or
-integrated in your **Rust application** as [Cargo crate](https://crates.io/crates/gr6j) to **run or calibrate
-run-off models**.
+This repository contains the GR6J rainfall-runoff model implemented in the Rust language.
 
 The model replicates the code from the official [GR6J model](https://gitlab.irstea.fr/HYCAR-Hydro/airgr)
 and was fully against the airGR R module. This tool adds much more features such as:
@@ -26,19 +23,6 @@ and was fully against the airGR R module. This tool adds much more features such
   [metrics](gr6j-python/examples/calibration_20240427_1253/Metrics.csv).
 
 ## Getting started
-
-### Python
-
-Download the Python package using `pip`:
-
-    pip install gr6j
-
-Follow the three examples in the [example folder](gr6j-python/examples) to run
-a [simple model](gr6j-python/examples/simple_model.py)
-or a model with [two sub-models or sub-catchments](gr6j-python/examples/two_hydrological_unit_model.py) or
-[calibrate](gr6j-python/examples/calibration.py) the parameters using a gauged flow.
-
-### Rust
 
 Add the crate to your Rust project first:
 
