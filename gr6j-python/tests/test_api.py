@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 from datetime import date
 
@@ -18,10 +20,15 @@ from gr6j import (
 )
 
 
-def test_simple_model():
+@pytest.fixture
+def data_path() -> Path:
+    return Path(__file__).parent.parent.parent / "gr6j-core" / "src" / "test_data"
+
+
+def test_simple_model(data_path):
     # Read the input data
     data = pd.read_csv(
-        r"../../gr6j-core/src/test_data/airGR_L0123001_dataset.csv",
+        data_path / "airGR_L0123001_dataset.csv",
         index_col=[0],
         parse_dates=True,
         dayfirst=True,

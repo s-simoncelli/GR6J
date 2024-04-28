@@ -27,6 +27,11 @@ jobs:
   #          architecture: x64
   #      - name: Install fontconfig
   #        run: sudo apt-get install -y fontconfig libfontconfig-dev libfontconfig1 libfontconfig1-dev
+
+  #  - name: Test Python API
+  #    run: |
+  #      pip install pytest pandas
+  #      python -m pytest
   #      - name: Build wheels
   #        uses: PyO3/maturin-action@v1
   #        with:
@@ -39,6 +44,7 @@ jobs:
   #        with:
   #          name: wheels-linux-${{ matrix.platform.target }}
   #          path: dist
+  #  overwrite: true
 
   windows:
     runs-on: windows-latest
@@ -51,6 +57,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
+      - name: Test Python API
+        run: |
+          pip install pytest pandas
+          python -m pytest
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -62,6 +72,7 @@ jobs:
         with:
           name: wheels-windows-${{ matrix.platform.target }}
           path: dist
+          overwrite: true
 
   macos:
     runs-on: macos-latest
@@ -74,6 +85,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
+      - name: Test Python API
+        run: |
+          pip install pytest pandas
+          python -m pytest
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -85,6 +100,7 @@ jobs:
         with:
           name: wheels-macos-${{ matrix.platform.target }}
           path: dist
+          overwrite: true
 
   sdist:
     runs-on: ubuntu-latest
