@@ -28,6 +28,10 @@ impl X1 {
     pub fn unit() -> PyResult<String> {
         Ok(RsX1::unit().to_string())
     }
+    #[staticmethod]
+    pub fn description() -> PyResult<String> {
+        Ok(RsX1::description().to_string())
+    }
     pub fn __repr__(&self) -> PyResult<String> {
         Ok(self.0.value().to_string())
     }
@@ -58,6 +62,10 @@ impl X2 {
     #[staticmethod]
     pub fn unit() -> PyResult<String> {
         Ok(RsX2::unit().to_string())
+    }
+    #[staticmethod]
+    pub fn description() -> PyResult<String> {
+        Ok(RsX1::description().to_string())
     }
     pub fn __repr__(&self) -> PyResult<String> {
         Ok(self.0.value().to_string())
@@ -90,6 +98,10 @@ impl X3 {
     pub fn unit() -> PyResult<String> {
         Ok(RsX3::unit().to_string())
     }
+    #[staticmethod]
+    pub fn description() -> PyResult<String> {
+        Ok(RsX1::description().to_string())
+    }
     pub fn __repr__(&self) -> PyResult<String> {
         Ok(self.0.value().to_string())
     }
@@ -120,6 +132,10 @@ impl X4 {
     #[staticmethod]
     pub fn unit() -> PyResult<String> {
         Ok(RsX4::unit().to_string())
+    }
+    #[staticmethod]
+    pub fn description() -> PyResult<String> {
+        Ok(RsX1::description().to_string())
     }
     pub fn __repr__(&self) -> PyResult<String> {
         Ok(self.0.value().to_string())
@@ -152,6 +168,10 @@ impl X5 {
     pub fn unit() -> PyResult<String> {
         Ok(RsX5::unit().to_string())
     }
+    #[staticmethod]
+    pub fn description() -> PyResult<String> {
+        Ok(RsX1::description().to_string())
+    }
     pub fn __repr__(&self) -> PyResult<String> {
         Ok(self.0.value().to_string())
     }
@@ -182,6 +202,10 @@ impl X6 {
     #[staticmethod]
     pub fn unit() -> PyResult<String> {
         Ok(RsX6::unit().to_string())
+    }
+    #[staticmethod]
+    pub fn description() -> PyResult<String> {
+        Ok(RsX1::description().to_string())
     }
     pub fn __repr__(&self) -> PyResult<String> {
         Ok(self.0.value().to_string())

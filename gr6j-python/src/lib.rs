@@ -33,6 +33,7 @@ impl GR6JModel {
             destination: inputs.destination,
             observed_runoff: inputs.observed_runoff.as_deref(),
             run_off_unit: inputs.run_off_unit.unwrap_or_default().into(),
+            logging: None,
         };
         let model = GR6JModel {
             run_period,

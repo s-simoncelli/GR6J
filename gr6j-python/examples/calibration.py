@@ -20,9 +20,6 @@ from gr6j import (
 logging.basicConfig(format="[%(asctime)-15s] %(levelname)s %(message)s")
 logging.getLogger().setLevel(logging.INFO)
 
-# disable logger when running single model instances
-logging.getLogger("gr6j.model").disabled = True
-
 # Read the input data
 data = pd.read_csv(
     r"../../gr6j-core/src/test_data/airGR_L0123001_dataset.csv",

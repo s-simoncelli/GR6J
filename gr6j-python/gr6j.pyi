@@ -1,6 +1,7 @@
 from datetime import date
 from enum import Enum
 
+
 class X1:
     def __init__(self, value: float):
         """
@@ -15,6 +16,12 @@ class X1:
         """
 
     @staticmethod
+    def description() -> str:
+        """
+        The parameter description.
+        """
+
+    @staticmethod
     def min() -> str:
         """
         The parameter minimum value.
@@ -25,6 +32,7 @@ class X1:
         """
         The parameter maximum value.
         """
+
 
 class X2:
     def __init__(self, value: float):
@@ -40,6 +48,12 @@ class X2:
         """
 
     @staticmethod
+    def description() -> str:
+        """
+        The parameter description.
+        """
+
+    @staticmethod
     def min() -> str:
         """
         The parameter minimum value.
@@ -50,6 +64,7 @@ class X2:
         """
         The parameter maximum value.
         """
+
 
 class X3:
     def __init__(self, value: float):
@@ -65,6 +80,12 @@ class X3:
         """
 
     @staticmethod
+    def description() -> str:
+        """
+        The parameter description.
+        """
+
+    @staticmethod
     def min() -> str:
         """
         The parameter minimum value.
@@ -75,6 +96,7 @@ class X3:
         """
         The parameter maximum value.
         """
+
 
 class X4:
     def __init__(self, value: float):
@@ -90,6 +112,12 @@ class X4:
         """
 
     @staticmethod
+    def description() -> str:
+        """
+        The parameter description.
+        """
+
+    @staticmethod
     def min() -> str:
         """
         The parameter minimum value.
@@ -100,6 +128,7 @@ class X4:
         """
         The parameter maximum value.
         """
+
 
 class X5:
     def __init__(self, value: float):
@@ -115,6 +144,12 @@ class X5:
         """
 
     @staticmethod
+    def description() -> str:
+        """
+        The parameter description.
+        """
+
+    @staticmethod
     def min() -> str:
         """
         The parameter minimum value.
@@ -125,6 +160,7 @@ class X5:
         """
         The parameter maximum value.
         """
+
 
 class X6:
     def __init__(self, value: float):
@@ -140,6 +176,12 @@ class X6:
         """
 
     @staticmethod
+    def description() -> str:
+        """
+        The parameter description.
+        """
+
+    @staticmethod
     def min() -> str:
         """
         The parameter minimum value.
@@ -151,6 +193,7 @@ class X6:
         The parameter maximum value.
         """
 
+
 class StoreLevels:
     """
     Class to define custom store levels to use at the beginning of
@@ -158,7 +201,7 @@ class StoreLevels:
     """
 
     def __init__(
-        self, production_store: float, routing_store: float, exponential_store: float
+            self, production_store: float, routing_store: float, exponential_store: float
     ):
         """
         Initialise the class to define custom store levels to use at the beginning of
@@ -171,6 +214,7 @@ class StoreLevels:
         :param routing_store: The routing store level (mm)
         :param exponential_store: The exponential store level (mm)
         """
+
 
 class CatchmentData:
     """
@@ -198,15 +242,15 @@ class CatchmentData:
     """ The initial in the store levels. """
 
     def __init__(
-        self,
-        area: float,
-        x1: X1,
-        x2: X2,
-        x3: X3,
-        x4: X4,
-        x5: X5,
-        x6: X6,
-        store_levels: StoreLevels | None = None,
+            self,
+            area: float,
+            x1: X1,
+            x2: X2,
+            x3: X3,
+            x4: X4,
+            x5: X5,
+            x6: X6,
+            store_levels: StoreLevels | None = None,
     ):
         """
         Initialise the class to define the data (catchment area, GR6J parameters and
@@ -232,6 +276,7 @@ class CatchmentData:
         the GR6J default initial  conditions.
         """
 
+
 class ModelPeriod:
     """
     Class used to define a model time range.
@@ -249,6 +294,7 @@ class ModelPeriod:
         :param end: The period end date.
         """
 
+
 class RunOffUnit(Enum):
     """
     Enumerator used to specify the unit of measurements of the simulated run-off. It
@@ -263,6 +309,7 @@ class RunOffUnit(Enum):
     CUBIC_METRE_PER_DAY = None
     ML_PER_DAY = None
     CUBIC_METRE_PER_SECOND = None
+
 
 class GR6JModelInputs:
     """
@@ -325,16 +372,16 @@ class GR6JModelInputs:
     """ Convert the run-off to the desired unit of measurement. """
 
     def __init__(
-        self,
-        time: list[date],
-        precipitation: list[float],
-        evapotranspiration: list[float],
-        catchment: list[CatchmentData] | CatchmentData,
-        run_period: ModelPeriod,
-        warmup_period: ModelPeriod | None = None,
-        destination: str | None = None,
-        observed_runoff: list[float] | None = None,
-        run_off_unit: RunOffUnit | None = None,
+            self,
+            time: list[date],
+            precipitation: list[float],
+            evapotranspiration: list[float],
+            catchment: list[CatchmentData] | CatchmentData,
+            run_period: ModelPeriod,
+            warmup_period: ModelPeriod | None = None,
+            destination: str | None = None,
+            observed_runoff: list[float] | None = None,
+            run_off_unit: RunOffUnit | None = None,
     ):
         """
         Initialise the inputs to the GR6J model.
@@ -362,6 +409,7 @@ class GR6JModelInputs:
         Default to None.
         """
 
+
 class Metric:
     name: str
     """ The metric name """
@@ -369,6 +417,7 @@ class Metric:
     """ The metric ideal value. """
     value: float
     """ The metric value from the difference between the observed and simulated data. """
+
 
 class CalibrationMetric:
     nash_sutcliffe: Metric
@@ -394,6 +443,7 @@ class CalibrationMetric:
      kling_gupta2012 because the alpha component is calculated using the flow percentile
      from the flow duration curve instead of using the standard deviation.
      See <https://www.tandfonline.com/doi/full/10.1080/02626667.2018.1552002> """
+
 
 class ModelStepData:
     time: date
@@ -432,6 +482,7 @@ class ModelStepData:
     run_off: float
     """ Simulated outflow at catchment outlet (mm) """
 
+
 class GR6JModelOutputs:
     """
     Fetch the results. To get the time and run-off vector as Pandas DataFrame use:
@@ -457,6 +508,7 @@ class GR6JModelOutputs:
     only one list). Each nested list contains the results (as instances of 
     `ModelStepData`) for each time steps for the sub-model. """
 
+
 class GR6JModel:
     """
     Load and run a GR6J model.
@@ -475,6 +527,7 @@ class GR6JModel:
         simulated time and run off values.
         """
 
+
 class X1Range:
     lower_bound: float
     """ The parameter range lower bound. """
@@ -489,6 +542,7 @@ class X1Range:
         :param upper_bound: The parameter upper bound. If None the X1 maximum value
         will be used.
         """
+
 
 class X2Range:
     lower_bound: float
@@ -506,6 +560,7 @@ class X2Range:
         will be used.
         """
 
+
 class X3Range:
     lower_bound: float
     """ The parameter range lower bound. """
@@ -520,6 +575,7 @@ class X3Range:
         :param upper_bound: The parameter upper bound. If None the X3 maximum value
         will be used.
         """
+
 
 class X4Range:
     lower_bound: float
@@ -536,6 +592,7 @@ class X4Range:
         will be used.
         """
 
+
 class X5Range:
     lower_bound: float
     """ The parameter range lower bound. """
@@ -551,6 +608,7 @@ class X5Range:
         will be used.
         """
 
+
 class X6Range:
     lower_bound: float
     """ The parameter range lower bound. """
@@ -565,6 +623,7 @@ class X6Range:
         :param upper_bound: The parameter upper bound. If None the X6 maximum value
         will be used.
         """
+
 
 class CalibrationCatchmentData:
     """
@@ -587,14 +646,14 @@ class CalibrationCatchmentData:
     """ Range for the time constant of exponential store (mm) """
 
     def __init__(
-        self,
-        area: float,
-        x1_range: X1Range,
-        x2_range: X2Range,
-        x3_range: X3Range,
-        x4_range: X4Range,
-        x5_range: X5Range,
-        x6_range: X6Range,
+            self,
+            area: float,
+            x1_range: X1Range,
+            x2_range: X2Range,
+            x3_range: X3Range,
+            x4_range: X4Range,
+            x5_range: X5Range,
+            x6_range: X6Range,
     ):
         """
         Define the data for the catchment or hydrological unit to calibrate. With this
@@ -615,6 +674,7 @@ class CalibrationCatchmentData:
         :param x6_range: Range for the time constant of exponential store (mm). This is
         a two-item tuple with the lower an upper bound.
         """
+
 
 class CalibrationInputs:
     time: list[date]
@@ -645,17 +705,17 @@ class CalibrationInputs:
     series and flow duration curves for each model. """
 
     def __init__(
-        self,
-        time: list[date],
-        precipitation: list[float],
-        evapotranspiration: list[float],
-        observed_runoff: list[float],
-        catchment: CalibrationCatchmentData | list[CalibrationCatchmentData],
-        calibration_period: ModelPeriod,
-        destination: str,
-        run_off_unit: RunOffUnit,
-        sample_size: int | None = None,
-        generate_comparison_charts: bool | None = None,
+            self,
+            time: list[date],
+            precipitation: list[float],
+            evapotranspiration: list[float],
+            observed_runoff: list[float],
+            catchment: CalibrationCatchmentData | list[CalibrationCatchmentData],
+            calibration_period: ModelPeriod,
+            destination: str,
+            run_off_unit: RunOffUnit,
+            sample_size: int | None = None,
+            generate_comparison_charts: bool | None = None,
     ):
         """
         Define the input data to calibrate a GR6J model.
@@ -685,6 +745,7 @@ class CalibrationInputs:
         observed and simulated run-off time series and flow duration curves for each
          model. If `true`, the tool will generate as many as `self.sample_size` figures.
         """
+
 
 class Calibration:
     time: list[date]

@@ -139,6 +139,10 @@ pub struct GR6JModelInputs<'a> {
     pub observed_runoff: Option<&'a [f64]>,
     /// Convert the run-off to the desired unit of measurement.
     pub run_off_unit: RunOffUnit,
+    /// Handle logging. If false, logging is permanently disabled. When true, log messages will  
+    /// still need to be exposed via environment variables or another crate (such as env_logger).
+    /// When None this defaults to true.
+    pub logging: Option<bool>,
 }
 
 /// The data for the catchment or hydrological unit to calibrate.

@@ -8,10 +8,7 @@ use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Enable relevant logs
-    env_logger::builder()
-        .filter_level(LevelFilter::Info)
-        .filter_module("gr6j::model", LevelFilter::Off)
-        .init();
+    env_logger::builder().filter_level(LevelFilter::Info).init();
 
     // Collect the hydrological data
     let data = load_data()?;

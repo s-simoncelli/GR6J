@@ -68,6 +68,8 @@ pub struct GR6JModel {
     pub observed: Option<Vec<f64>>,
     /// Conversion to apply to the run-off data.
     pub run_off_unit: RunOffUnit,
+    /// Enable logging
+    logging: bool,
 }
 
 impl GR6JModel {
@@ -80,6 +82,8 @@ impl GR6JModel {
     ///
     /// returns: `Result<Self, LoadModelError>`
     pub fn new(inputs: GR6JModelInputs) -> Result<Self, LoadModelError> {
+        let logging = inputs.logging.unwrap_or(true);
+
         // Check hydrological data
         if inputs.time.len() != inputs.precipitation.len() {
             return Err(LoadModelError::MismatchedLength("precipitation".to_string()));
@@ -126,10 +130,12 @@ impl GR6JModel {
                 if warmup_end + TimeDelta::try_days(1).unwrap() != inputs.run_period.start {
                     warmup_start -= TimeDelta::try_days(1).unwrap();
                 }
-                warn!(
-                    "Model warm-up period not defined. Using default period {}-{}",
-                    warmup_start, warmup_end
-                );
+                if logging {
+                    warn!(
+                        "Model warm-up period not defined. Using default period {}-{}",
+                        warmup_start, warmup_end
+                    );
+                }
 
                 if warmup_start >= inputs.time[0] {
                     // one year is available
@@ -139,18 +145,22 @@ impl GR6JModel {
                     )
                 } else if inputs.run_period.start > inputs.time[0] {
                     // reduced warm-up period
-                    warn!(
-                        "The input data is too short to define a one-year warm-up period. Period \
+                    if logging {
+                        warn!(
+                            "The input data is too short to define a one-year warm-up period. Period \
                         will start from {} which is the first date in the time vector",
-                        inputs.time[0]
-                    );
+                            inputs.time[0]
+                        );
+                    }
                     Some(
                         ModelPeriod::new(inputs.time[0], warmup_end)
                             .map_err(|e| LoadModelError::Generic(e.to_string()))?,
                     )
                 } else {
                     // disregard warm-up period if there is no enough data
-                    warn!("The input data is too short to define a warm-up period");
+                    if logging {
+                        warn!("The input data is too short to define a warm-up period");
+                    }
                     None
                 }
             }
@@ -171,13 +181,15 @@ impl GR6JModel {
                 Some(period)
             }
         };
-        if warmup_period.is_some() {
+        if warmup_period.is_some() && logging {
             info!("Model warm-up period set to: {:?}", warmup_period.as_ref().unwrap());
         }
-        info!(
-            "Model run period set to {}-{}",
-            inputs.run_period.start, inputs.run_period.end
-        );
+        if logging {
+            info!(
+                "Model run period set to {}-{}",
+                inputs.run_period.start, inputs.run_period.end
+            );
+        }
 
         // create the destination folder
         let destination: Option<PathBuf> = if let Some(dest) = inputs.destination {
@@ -274,6 +286,7 @@ impl GR6JModel {
             destination,
             observed,
             run_off_unit: inputs.run_off_unit,
+            logging,
         })
     }
 
@@ -288,8 +301,9 @@ impl GR6JModel {
         let mut catchment_outputs: Vec<ModelStepDataVector> = vec![];
         for model_index in 0..self.models.len() {
             let mut outputs: Vec<ModelStepData> = vec![];
-            debug!("Started run for hydrological unit {model_index}");
-
+            if self.logging {
+                debug!("Started run for hydrological unit {model_index}");
+            }
             catchment_outputs.push({
                 loop {
                     let out = self.step(model_index);
@@ -307,12 +321,15 @@ impl GR6JModel {
             });
         }
 
-        info!("Simulation is completed :)");
-
+        if self.logging {
+            info!("Simulation is completed :)");
+        }
         let time = catchment_outputs[0].time();
 
         // get the run off for each hydrological unit and scale it by area to get the volume
-        debug!("Collecting run-off data");
+        if self.logging {
+            debug!("Collecting run-off data");
+        }
         let mut run_offs: Vec<Vec<f64>> = vec![];
         for (model_index, data) in catchment_outputs.iter().enumerate() {
             run_offs.push(data.run_off(Some(self.models[model_index].area)));
@@ -360,26 +377,32 @@ impl GR6JModel {
                 self.run_off_unit.unit_label(),
                 &runoff_dest,
             )?;
-            debug!("Exported run-off file {}", runoff_dest.to_str().unwrap().to_string());
+            if self.logging {
+                debug!("Exported run-off file {}", runoff_dest.to_str().unwrap().to_string());
+            }
 
             // Export parameters
             match results.catchment_outputs.len() {
                 1 => {
                     let dest = destination.join("Parameters.csv");
                     self.write_parameter_file(&self.models[0], &dest)?;
-                    debug!(
-                        "Exported parameter CSV files to '{}'",
-                        dest.to_str().unwrap().to_string()
-                    );
+                    if self.logging {
+                        debug!(
+                            "Exported parameter CSV files to '{}'",
+                            dest.to_str().unwrap().to_string()
+                        );
+                    }
                 }
                 _ => {
                     for (uh, model) in self.models.iter().enumerate() {
                         let dest = destination.join(format!("Parameters_HU{}.csv", uh + 1));
                         self.write_parameter_file(model, &dest)?;
-                        debug!(
-                            "Exported parameter CSV files to '{}'",
-                            dest.to_str().unwrap().to_string()
-                        );
+                        if self.logging {
+                            debug!(
+                                "Exported parameter CSV files to '{}'",
+                                dest.to_str().unwrap().to_string()
+                            );
+                        }
                     }
                 }
             }
@@ -387,7 +410,9 @@ impl GR6JModel {
             // Export FDC
             let fdc_dest = destination.join("FDC.csv");
             sim_fdc.to_csv(&fdc_dest, self.run_off_unit.unit_label())?;
-            debug!("Exported FDC CSV file {}", fdc_dest.to_str().unwrap().to_string());
+            if self.logging {
+                debug!("Exported FDC CSV file {}", fdc_dest.to_str().unwrap().to_string());
+            }
 
             // Generate charts
             generate_summary_chart(self, &results, destination)
@@ -396,14 +421,18 @@ impl GR6JModel {
             let obs_fdc = self.observed.as_ref().map(|q| Fdc::new(q));
             save_fdc_chart(self, sim_fdc, obs_fdc, destination)
                 .map_err(|e| RunModelError::CannotGenerateChart("fdc".to_string(), e.to_string()))?;
-            debug!("Exported flow duration curve chart");
+            if self.logging {
+                debug!("Exported flow duration curve chart");
+            }
 
             // Export metrics
             if let Some(ref metrics) = results.metrics {
                 let metric_dest = destination.join("Metrics.csv");
                 let metric_dest_string = metric_dest.to_str().unwrap().to_string();
                 metrics.to_csv(metric_dest)?;
-                debug!("Exported metric file {}", metric_dest_string);
+                if self.logging {
+                    debug!("Exported metric file {}", metric_dest_string);
+                }
             }
         }
 
@@ -797,6 +826,7 @@ mod tests {
             destination: None,
             observed_runoff: None,
             run_off_unit: RunOffUnit::NoConversion,
+            logging: Some(false),
         };
 
         let mut model = GR6JModel::new(inputs).unwrap();
@@ -842,6 +872,7 @@ mod tests {
             destination: None,
             observed_runoff: None,
             run_off_unit: RunOffUnit::NoConversion,
+            logging: Some(false),
         };
 
         let model = GR6JModel::new(inputs);
@@ -866,6 +897,7 @@ mod tests {
             destination: None,
             observed_runoff: None,
             run_off_unit: RunOffUnit::NoConversion,
+            logging: Some(false),
         };
         let model = GR6JModel::new(inputs);
         assert_eq!(
@@ -890,6 +922,7 @@ mod tests {
             destination: None,
             observed_runoff: None,
             run_off_unit: RunOffUnit::NoConversion,
+            logging: Some(false),
         };
         let model = GR6JModel::new(inputs);
         assert_eq!(
@@ -913,6 +946,7 @@ mod tests {
             destination: None,
             observed_runoff: None,
             run_off_unit: RunOffUnit::NoConversion,
+            logging: Some(false),
         };
         let model = GR6JModel::new(inputs);
         assert_eq!(
@@ -942,6 +976,7 @@ mod tests {
             destination: None,
             observed_runoff: None,
             run_off_unit: RunOffUnit::NoConversion,
+            logging: Some(false),
         };
         let model = GR6JModel::new(inputs);
         assert_eq!(
@@ -1073,6 +1108,7 @@ mod tests {
             destination: None,
             observed_runoff: None,
             run_off_unit: RunOffUnit::NoConversion,
+            logging: Some(false),
         };
 
         let mut model = GR6JModel::new(inputs).unwrap();

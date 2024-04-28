@@ -119,6 +119,7 @@ impl<'a> Calibration<'a> {
                 destination: None,
                 observed_runoff: Some(inputs.observed_runoff),
                 run_off_unit: inputs.run_off_unit.clone(),
+                logging: Some(false),
             });
         }
 

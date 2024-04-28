@@ -52,6 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         destination: Some(Path::new(r"gr6j-core\examples\results").to_path_buf()),
         observed_runoff: Some(&data.observed_runoff),
         run_off_unit: RunOffUnit::NoConversion,
+        logging: None,
     };
     let mut model = GR6JModel::new(inputs)?;
     model.run()?;

@@ -37,7 +37,7 @@ catchment = CatchmentData(
     area=1.0, x1=X1(31), x2=X2(3.47), x3=X3(32), x4=X4(2.1), x5=X5(0.55), x6=X6(5.3)
 )
 # you can also access the unit and range of each parameter using
-print(f"Allowed range: {X1.min()}-{X1.max()} (X1.unit())")
+print(f"Allowed range for {X1.description()}: {X1.min()}-{X1.max()} ({X1.unit()})")
 
 inputs = GR6JModelInputs(
     time=data.index.tolist(),
@@ -60,5 +60,5 @@ df = pd.DataFrame(zip(results.time, results.run_off), columns=["Time", "Run off"
 df.set_index("Time", inplace=True)
 print(df)
 
-# Get the exchange from routing store" for the only model and third time step use:
+# Get the exchange from routing store for the only catchment and third time step
 print(results.catchment_outputs[0][2].exchange_from_routing_store)

@@ -67,5 +67,5 @@ df = pd.DataFrame(zip(results.time, results.run_off), columns=["Time", "Run off"
 df.set_index("Time", inplace=True)
 print(df)
 
-# Get the exchange from routing store" for the only model and third time step use:
+# Get the exchange from routing store for the only catchment and third time step
 print(results.catchment_outputs[0][2].exchange_from_routing_store)
