@@ -31,12 +31,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: -i ${{ matrix.python-version }} --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
+          args: -i ${{ matrix.python-version }} --release --out dist -m gr6j-python/Cargo.toml
           sccache: 'true'
           manylinux: auto
       - name: Test Python API
         run: |
           pip install pytest pandas
+          pip install gr6j --no-index --find-links dist --force-reinstall --no-deps
           python -c "import gr6j"
           python -m pytest
       - name: Upload wheels
@@ -61,11 +62,12 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: -i ${{ matrix.python-version }} --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
+          args: -i ${{ matrix.python-version }} --release --out dist -m gr6j-python/Cargo.toml
           sccache: 'true'
       - name: Test Python API
         run: |
           pip install pytest pandas
+          pip install gr6j --no-index --find-links dist --force-reinstall --no-deps
           python -c "import gr6j"
           python -m pytest
       - name: Upload wheels
@@ -95,6 +97,7 @@ jobs:
       - name: Test Python API
         run: |
           pip install pytest pandas
+          pip install gr6j --no-index --find-links dist --force-reinstall --no-deps
           python -c "import gr6j"
           python -m pytest
       - name: Upload wheels
