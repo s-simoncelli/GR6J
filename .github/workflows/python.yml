@@ -27,6 +27,8 @@ jobs:
           architecture: x64
       - name: Install fontconfig
         run: sudo apt-get install -y fontconfig libfontconfig-dev libfontconfig1 libfontconfig1-dev
+      - name: Export fontconfig env variable
+        run: export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
