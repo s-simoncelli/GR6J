@@ -14,63 +14,64 @@ permissions:
 
 jobs:
   # Ubuntu does not build with fontconfig dev
-  #  linux:
-  #    runs-on: ubuntu-latest
-  #    strategy:
-  #      matrix:
-  #        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
-  #    steps:
-  #      - uses: actions/checkout@v4
-  #      - uses: actions/setup-python@v5
-  #        with:
-  #          python-version: ${{ matrix.python-version }}
-  #          architecture: x64
-  #      - name: Install fontconfig
-  #        run: sudo apt-get install -y fontconfig libfontconfig-dev libfontconfig1 libfontconfig1-dev
-
-  #  - name: Test Python API
-  #    run: |
-  #      pip install pytest pandas
-  #      python -m pytest
-  #      - name: Build wheels
-  #        uses: PyO3/maturin-action@v1
-  #        with:
-  #          target: ${{ matrix.platform.target }}
-  #          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
-  #          sccache: 'true'
-  #          manylinux: auto
-  #      - name: Upload wheels
-  #        uses: actions/upload-artifact@v4
-  #        with:
-  #          name: wheels-linux-${{ matrix.platform.target }}
-  #          path: dist
-  #  overwrite: true
-
-  windows:
-    runs-on: windows-latest
+  linux:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+        python-version: [ '3.10', '3.11', '3.12' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
-      - name: Test Python API
-        run: |
-          pip install pytest pandas
-          python -m pytest
+      - name: Install fontconfig
+        run: sudo apt-get install -y fontconfig libfontconfig-dev libfontconfig1 libfontconfig1-dev
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
+          target: ${{ matrix.target }}
+          args: -i ${{ matrix.python-version }} --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
           sccache: 'true'
+          manylinux: auto
+      - name: Test Python API
+        run: |
+          pip install pytest pandas
+          python -c "import gr6j"
+          python -m pytest
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-windows-${{ matrix.platform.target }}
+          name: wheels-linux-${{ matrix.platform.target }}
+          path: dist
+          overwrite: true
+
+  windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: [ '3.10', '3.11', '3.12' ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: -i ${{ matrix.python-version }} --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
+          sccache: 'true'
+      - name: Test Python API
+        run: |
+          pip install pytest pandas
+          python -c "import gr6j"
+          python -m pytest
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-${{ python-version }}
           path: dist
           overwrite: true
 
@@ -78,23 +79,24 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
+        python-version: [ '3.11', '3.12' ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           architecture: x64
+      - name: Build wheels - x86_64
+        uses: PyO3/maturin-action@v1
+        with:
+          target: x86_64
+          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
+          sccache: 'true'
       - name: Test Python API
         run: |
           pip install pytest pandas
+          python -c "import gr6j"
           python -m pytest
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
-          sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
