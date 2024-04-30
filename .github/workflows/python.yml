@@ -91,8 +91,8 @@ jobs:
       - name: Build wheels - x86_64
         uses: PyO3/maturin-action@v1
         with:
-          target: x86_64
-          args: --release --out dist --find-interpreter -m gr6j-python/Cargo.toml
+          target: ${{ matrix.target }}
+          args: -i ${{ matrix.python-version }} --release --out dist -m gr6j-python/Cargo.toml
           sccache: 'true'
       - name: Test Python API
         run: |
